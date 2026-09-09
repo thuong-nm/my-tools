@@ -1,0 +1,8 @@
+/* The one stylesheet Turbopack compiles. Import order matters: Tailwind, then tokens, then
+   element defaults. */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./theme.css";
+@import "./base.css";

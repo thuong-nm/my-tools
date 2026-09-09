@@ -1,0 +1,19 @@
+// Storage model. This is NOT the domain model (AGENTS.md rule 5): it is shaped by
+// what Postgres stores well, while the domain is shaped by invariants. The two are
+// bridged by mappers in lib/infrastructure/prisma/mappers/.
+//
+// Two conventions to keep when adding models:
+//   - Money is `Int`, in the currency's smallest whole unit. Never Float (binary
+//     rounding), never Decimal unless the currency actually has a minor unit.
+//   - Every timestamp is `@db.Timestamptz(6)`. `timestamp without time zone`
+//     silently drops the offset, and that mistake surfaces as a wrong-day bug.
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Connection URL lives in prisma.config.ts (Prisma 7 convention).
+}

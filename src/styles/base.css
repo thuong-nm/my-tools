@@ -1,0 +1,26 @@
+/* Inside `@layer base` so a utility class always wins. */
+
+@layer base {
+  /* The picker glyph renders near-black by default and out-shouts the value beside it. */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.4;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 150ms;
+  }
+
+  input[type="date"]:hover::-webkit-calendar-picker-indicator,
+  input[type="date"]:focus::-webkit-calendar-picker-indicator {
+    opacity: 0.85;
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
