@@ -20,6 +20,6 @@ ENV HOSTNAME=0.0.0.0
 
 RUN npx prisma generate
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["npm", "run", "dev"]

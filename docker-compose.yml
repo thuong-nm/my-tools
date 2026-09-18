@@ -31,7 +31,7 @@ services:
       DATABASE_URL: postgresql://app:app@postgres:5432/app?schema=public
       WATCHPACK_POLLING: "true"
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - .:/app
       - app-node-modules:/app/node_modules
