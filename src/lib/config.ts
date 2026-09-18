@@ -40,9 +40,26 @@ const serverEnvSchema = z.object({
 
   /** Origins allowed to call `/api` from a browser. Empty means same-origin only. */
   CORS_ALLOWED_ORIGINS: originList,
+
+  // An optional integration, declared as a GROUP: leaving both blank turns bot checking off,
+  // but filling in only one half is a misconfiguration that must fail at startup rather than
+  // produce an adapter that silently lets everything through.
+  RECAPTCHA_SITE_KEY: z.string().min(1).optional(),
+  RECAPTCHA_SECRET_KEY: z.string().min(1).optional(),
+  RECAPTCHA_MIN_SCORE: z.coerce.number().min(0).max(1).default(0.5),
 });
 
 type ServerEnv = z.infer<typeof serverEnvSchema>;
+
+/** Absent when the group is unset — the shape makes "configured" unforgeable at a call site. */
+export type RecaptchaConfig =
+  | { readonly enabled: false }
+  | {
+      readonly enabled: true;
+      readonly siteKey: string;
+      readonly secretKey: string;
+      readonly minScore: number;
+    };
 
 export type ServerConfig = {
   readonly nodeEnv: ServerEnv["NODE_ENV"];
@@ -52,6 +69,7 @@ export type ServerConfig = {
   readonly database: { readonly url: string };
   readonly session: { readonly secret: string };
   readonly cors: { readonly allowedOrigins: readonly string[] };
+  readonly recaptcha: RecaptchaConfig;
 };
 
 export class ConfigError extends Error {
@@ -97,6 +115,15 @@ export function parseServerConfig(
 
   const env = parsed.data;
 
+  const siteKey = env.RECAPTCHA_SITE_KEY;
+  const secretKey = env.RECAPTCHA_SECRET_KEY;
+  if ((siteKey === undefined) !== (secretKey === undefined)) {
+    throw new ConfigError(
+      "Invalid environment configuration:\n" +
+        "  - RECAPTCHA_SITE_KEY and RECAPTCHA_SECRET_KEY must be set together, or both left blank.",
+    );
+  }
+
   return {
     nodeEnv: env.NODE_ENV,
     isProduction: env.NODE_ENV === "production",
@@ -105,6 +132,10 @@ export function parseServerConfig(
     database: { url: env.DATABASE_URL },
     session: { secret: env.SESSION_SECRET },
     cors: { allowedOrigins: env.CORS_ALLOWED_ORIGINS },
+    recaptcha:
+      siteKey !== undefined && secretKey !== undefined
+        ? { enabled: true, siteKey, secretKey, minScore: env.RECAPTCHA_MIN_SCORE }
+        : { enabled: false },
   };
 }
 

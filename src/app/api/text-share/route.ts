@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { sessionUserId } from "@/app/_lib/session";
 import { readJson } from "@/app/api/_lib/request";
+import { recaptchaTokenField, rejectIfNotHuman } from "@/app/api/_lib/require-human";
 import { badRequest, created, errorResponse, ok, unauthenticated } from "@/app/api/_lib/responses";
 import { createTextShare } from "@/lib/application/use-cases/create-text-share";
 import { listUserShares, MAX_HISTORY_LIMIT } from "@/lib/application/use-cases/list-user-shares";
@@ -16,6 +17,7 @@ const createTextShareSchema = z.object({
   content: z.string().min(1).max(MAX_SHARED_TEXT_LENGTH),
   format: z.enum(CONTENT_FORMATS),
   retention: z.enum(RETENTIONS),
+  recaptchaToken: recaptchaTokenField,
 });
 
 // An object, not a bare number, so a rejection names `limit` instead of Zod's anonymous path.
@@ -30,12 +32,17 @@ export async function POST(request: Request) {
   const parsed = createTextShareSchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error);
 
+  const rejected = await rejectIfNotHuman(request, "save_share", parsed.data.recaptchaToken);
+  if (rejected) return rejected;
+
   const ownerId = await sessionUserId();
 
   const { repositories, now, generateId, generateShareCode } = getContainer();
 
+  const { content, format, retention } = parsed.data;
+
   const result = await createTextShare(
-    { ...parsed.data, ...(ownerId ? { ownerId } : {}) },
+    { content, format, retention, ...(ownerId ? { ownerId } : {}) },
     { shares: repositories.textShares, now, generateId, generateShareCode },
   );
 
