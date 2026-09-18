@@ -15,10 +15,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 A Next.js 16 + Prisma 7 starter built as **ports & adapters (hexagonal)**, with the dependency
 rule enforced by ESLint rather than by good intentions.
 
-It ships **no business logic**. What it ships is the skeleton, the fences, and the conventions:
-one welcome page, one health route, the `{data}`/`{error}` envelope, `Result`, the two error
-channels, a lazily-parsed config, and a Prisma client behind a composition root. Everything
-below describes how to add to it.
+What it ships is the skeleton, the fences, and the conventions: the `{data}`/`{error}` envelope,
+`Result`, the two error channels, a lazily-parsed config, a Prisma client behind a composition
+root, one health route — and **one feature, Text Share**, as the worked example of all nine rules
+end to end. Everything below describes how to add to it; "State of the project" says what Text
+Share consists of and how to delete it.
 
 ## The constraint that shapes everything
 
@@ -259,17 +260,33 @@ src/
     theme.css               @theme mapping + light / dark palettes
     base.css                element defaults, all inside @layer base
   app/                      Next.js — the HTTP + UI adapter, kept thin
-    layout.tsx              <html>, the two next/font faces, the stylesheet import
-    page.tsx                the welcome page
+    layout.tsx              <html>, the two next/font faces, the stylesheet import, the
+                            pre-paint theme script
+    (text-share)/           the one feature. A route group, so it adds no URL segment
+      page.tsx              the tool, at /
+      s/[code]/page.tsx     a saved share, server-rendered
+      history/page.tsx      the signed-in account's saved short links, at /history
+      _lib/                 codec, format detection, markup parsing, timestamp formatting
+      _hooks/               hash sync, current URL, theme, toast, save, sign out
+      _components/          editor, preview, JSON + markup trees, header, account menu
+    (auth)/                 sign-in and registration. Also a route group
+      login/page.tsx        at /login; ?next= returns to the page that demanded a session
+      register/page.tsx     at /register
+      _components/          the shared email + password form
+      _lib/                 next-path.ts — rejects an off-origin ?next= (open redirect)
     global-error.tsx        replaces the root layout when the layout ITSELF throws,
                             so it ships its own <html> and its own CSS import
     not-found.tsx           site-wide 404
     icon.png  apple-icon.png  favicon.ico    ← file conventions, NOT public/
-    _lib/                   (add when needed) edge helpers shared by route groups and api/
-                            — session checks and anything that reads a signing secret
+    _lib/                   edge helpers shared by route groups and api/
+      session.ts            the ONE holder of the session secret: signs, reads, clears the cookie
+      current-user.ts       resolves the cookie's id against the database on every call
     api/                    route handlers — see app/api/README.md
       _lib/                 readJson, clientIpAddress, the {data}/{error} response builders
       health/route.ts       liveness probe
+      auth/                 register, login, logout, me — route handlers, never Server Actions
+      text-share/           POST to mint a short link (owner comes from the session, never the
+                            body), GET to list the caller's own, GET [code] to read one back
   components/               shared UI ONLY — a leaf, it imports nothing above it
     ui/                     shadcn/ui primitives
     utils.ts                cn()
@@ -278,21 +295,26 @@ src/
       envelope.ts           {data} / {error} shapes + the eight wire codes
       client.ts             apiFetch<T>() and ApiError, used by client components
     domain/                 ← innermost. Depends on nothing.
-      entities/             (add when needed)
-      value-objects/        (add when needed) Money, TimeSlot, …
+      entities/             text-share.ts
+      value-objects/        content-format, retention, share-code, shared-text
       errors/               DomainError (data, for Result) +
                             DomainRuleError (throwable, for illegal operations)
-      ports/                (add when needed) the capability boundaries — owned by the domain
-      shared/               Result, Branded, Json types — the shared kernel
-    application/            (add when needed) ← orchestration. Domain + its ports only.
+      ports/                repositories.ts — the capability boundaries, owned by the domain
+      shared/               Result, Branded, Json, identifier types — the shared kernel
+    application/            ← orchestration. Domain + its ports only.
       use-cases/            one file, one business operation
       dto/                  the wire format (future headless API contract)
     infrastructure/         ← adapters. Vendor code lives here and only here.
-      prisma/               client.ts; add mappers/ and repositories/ here
-      container.ts          composition root — the ONLY place adapters are built
+      auth/                 scrypt password hashing and HMAC session tokens. Fenced out of
+                            app/** — only app/_lib may reach it
+      prisma/               client.ts, mappers/, repositories/
+      share-code.ts         crypto-random short codes, rejection-sampled
+      container.ts          composition root — the ONLY place adapters are built,
+                            and where built repositories are handed out
+    testing/fakes/          in-memory test doubles. Fenced out of every production file
     config.ts               the ONLY place process.env is read
 prisma/                     stays at the root: tooling, not application code
-  schema.prisma             storage model (NOT the domain model) — currently empty
+  schema.prisma             storage model (NOT the domain model)
   migrations/               committed; never edit an applied migration
   generated/client/         generated TypeScript client — gitignored
 public/                     static assets. CSS and JS never go here — they must be
@@ -527,31 +549,84 @@ every other one.
 - `lib/http/` — the `{data}`/`{error}` envelope, the eight wire codes, `apiFetch`/`ApiError`.
 - `app/api/_lib/` — `readJson`, `clientIpAddress`, and the response builders including the
   `DomainError.code` → HTTP status mapping.
-- `lib/config.ts` (Zod, lazy, memoised) with `NODE_ENV`, `APP_URL`, `DATABASE_URL`, `TZ`,
-  `CORS_ALLOWED_ORIGINS`.
+- `lib/config.ts` (Zod, lazy, memoised) with `NODE_ENV`, `APP_URL`, `DATABASE_URL`,
+  `SESSION_SECRET`, `TZ`, `CORS_ALLOWED_ORIGINS`.
 - `src/proxy.ts` + `lib/http/cors.ts` — credentialed CORS for `/api/*` against the allow-list,
   with the policy kept as pure functions so it is testable without Next.js.
 - `lib/infrastructure/container.ts` — the composition root, currently wiring the Prisma client,
   `now` and `generateId`.
 - `lib/infrastructure/prisma/client.ts` — the Prisma 7 driver-adapter client with hot-reload reuse.
-- A welcome page, a site 404, a `global-error` boundary, `GET /api/health`.
+- A site 404, a `global-error` boundary, `GET /api/health`.
 - shadcn/ui primitives (alert, badge, button, card, checkbox, input, label, separator, skeleton,
   textarea), the Tailwind v4 token layer and the light/dark palettes.
 - Docker Compose for Postgres 16, one `Dockerfile` (dev image), both Vitest configs.
 
-**What is deliberately empty:**
+**The one feature, as the worked example of all nine rules — Text Share:**
 
-- **No domain model.** `lib/domain/{entities,value-objects,ports}` do not exist yet.
-- **No use cases.** `lib/application/` does not exist yet.
-- **No Prisma models.** `schema.prisma` has a generator and a datasource and nothing else; there
-  are no migrations.
-- **No repositories or mappers**, and no adapter for payment, calendar, CRM or notification.
-- **No auth.** No session, no password hashing. `src/proxy.ts` exists but does CORS only — it is
-  not an authorization boundary. The ESLint fence for `lib/infrastructure/auth/**` is already in
-  place so re-adding it cannot go wrong.
-- **Almost no tests.** Only the CORS policy and the config parser are covered
-  (`lib/http/cors.test.ts`, `lib/config.test.ts`). `npm run test:integration` still passes
-  vacuously, so a green `verify` says nothing about a flow you add.
+A two-pane editor that shares text, JSON, XML, HTML or Markdown either **in the URL hash** (no
+server involved) or as a **short link with an expiry** (`/s/<code>`). It is the reference vertical
+slice: copy its shape for the next feature.
+
+- `lib/domain` — `entities/text-share.ts` (write-once, so no state machine), value objects for
+  `ContentFormat`, `ShareCode`, `SharedText` and `Retention`, and the database boundary in
+  `ports/repositories.ts`.
+- `lib/application` — `create-text-share` (generates a code and INSERTs, retrying on conflict,
+  because the unique index *is* the lock) and `get-text-share` (an expired share is reported,
+  never deleted on read).
+- `lib/infrastructure` — the Prisma mapper and repository, plus `share-code.ts`. The container
+  now hands out **built repositories**, so `app/` never imports `prisma/**`.
+- `app/` — `POST /api/text-share`, `GET /api/text-share/[code]`, the tool at `/`, and the
+  server-rendered `/s/[code]`. Everything browser-side lives in the `(text-share)` route group's
+  `_lib`, `_hooks` and `_components`: the compression codec, format detection and the tree
+  renderers are editor affordances, not business rules.
+- Compression stays in the browser on purpose: share-by-URL has to work with no server, so the
+  database stores an opaque, already-compressed payload and the DTO carries only `code` — a use
+  case may not read `APP_URL` (rule 7).
+
+**Accounts, as the second worked example — sign in, register, history:**
+
+Email plus password, a stateless signed session cookie, and `/history` listing the short links
+an account has saved. It follows the same nine rules; read it alongside Text Share.
+
+- `lib/domain` — `entities/user.ts` (no state machine: an account has no states, and no
+  `createdAt`, because no rule reads one), value objects for `Email`, `RawPassword` and
+  `PasswordHash`, and `UserRepository` beside `TextShareRepository` in `ports/repositories.ts`.
+  `TextShare` gained `ownerId` and `createdAt` — the latter now belongs on the entity because
+  history orders by it, which is rule 5 working rather than being bent.
+- `lib/application` — `register-user`, `login-user`, `get-current-user`, `list-user-shares`.
+  `loginUser` answers one `INVALID_CREDENTIALS` for an unknown address, a wrong password AND a
+  malformed address: anything finer is an account-enumeration oracle.
+- `lib/infrastructure/auth` — `password-hasher.ts` (scrypt from `node:crypto`, so no native
+  dependency) and `session-token.ts` (HMAC-SHA256, `timingSafeEqual`). Hashing is injected as a
+  pair of functions, NOT a port — it is rule 9's worked example of what does not earn one.
+- `app/_lib/session.ts` — the only module that reads `SESSION_SECRET` and touches `cookies()`.
+  `app/**` is fenced out of `lib/infrastructure/auth/**`, so every caller comes through here.
+- `app/` — `POST /api/auth/{register,login,logout}`, `GET /api/auth/me`, and `GET /api/text-share`
+  for the caller's own history. Route handlers, not Server Actions (rule 8): a separate frontend
+  has to be able to sign in, and `curl` has to be able to test it.
+
+Two things worth copying: **the owner is taken from the session, never from the request body**,
+so no caller can file a share into someone else's history; and `TextShare.ownerId` is nullable,
+so saving while signed out still works exactly as before and needed no backfill.
+
+**What is still deliberately empty:**
+
+- **No rate limiting.** `POST /api/text-share` is public and unthrottled, and neither
+  `/api/auth/login` nor `/api/auth/register` is throttled either — nothing here slows down
+  password guessing. The payload cap in `SharedText` is the only guard.
+- **No account recovery, email verification or password change.** An address is never proved to
+  belong to whoever typed it.
+- **Sign-out cannot revoke an already-issued token.** The session is stateless, so the cookie
+  stays valid until it expires; the 30-day lifetime is the whole mitigation. A session table is
+  the change to make if that is not good enough.
+- **Registration tells the caller an address is taken** (`409`), which is an enumeration oracle
+  by design, because the alternative is a sign-up form that cannot explain itself. Login is
+  deliberately silent on the same question.
+- **No purge job** for expired shares, though `TextShare` carries the `expiresAt` index for one.
+  History shows an expired share flagged rather than hiding it — to its owner, a row that
+  silently disappears looks like data loss.
+- **No adapter for payment, calendar, CRM or notification**, and no `UnitOfWork` — one aggregate
+  has not needed a transaction spanning two repositories yet.
 
 **Starting a new project from this base:**
 
@@ -561,4 +636,10 @@ every other one.
    in `.env`.
 3. Model the domain first — entities and value objects in `lib/domain`, with unit tests that need
    no database. Then the port it needs, then the use case, then the Prisma model and repository,
-   then the route handler. In that order the fences never fight you.
+   then the route handler. In that order the fences never fight you. Text Share was built in
+   exactly that order; read it as the template.
+4. Delete Text Share if you do not want it: `src/app/(text-share)/`, `src/app/api/text-share/`,
+   the `TextShare` model and its migration, and the `textShares` entry in the container.
+5. Delete accounts if you do not want them: `src/app/(auth)/`, `src/app/api/auth/`,
+   `src/app/_lib/`, `src/lib/infrastructure/auth/`, the `User` model plus `TextShare.ownerId`,
+   and the `users`/`hashPassword`/`verifyPassword` entries in the container.

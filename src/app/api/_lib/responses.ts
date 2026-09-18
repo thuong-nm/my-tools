@@ -15,7 +15,11 @@ import {
 const WIRE_CODE: Readonly<Record<string, WireCode>> = {
   VALIDATION_FAILED: "VALIDATION_ERROR",
   INVALID_CREDENTIALS: "UNAUTHENTICATED",
+  EMAIL_ALREADY_REGISTERED: "CONFLICT",
   REPOSITORY_CONFLICT: "CONFLICT",
+  // 410 Gone is not one of the published eight, and an expired link is indistinguishable
+  // from a missing one to a client: both mean "there is nothing here".
+  TEXT_SHARE_EXPIRED: "NOT_FOUND",
 };
 
 export function wireCode(code: string): WireCode {

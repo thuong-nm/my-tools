@@ -31,6 +31,10 @@ const serverEnvSchema = z.object({
       "DATABASE_URL must be a PostgreSQL connection string",
     ),
 
+  /** Signs the session cookie. 32 characters is the HMAC-SHA256 block size, and a shorter
+   *  secret is the one configuration mistake that silently forges every account. */
+  SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
+
   /** Timestamps are stored as UTC; this is the zone server-side rendering formats them in. */
   TZ: z.string().default("Asia/Ho_Chi_Minh"),
 
@@ -46,6 +50,7 @@ export type ServerConfig = {
   readonly appUrl: string;
   readonly timeZone: string;
   readonly database: { readonly url: string };
+  readonly session: { readonly secret: string };
   readonly cors: { readonly allowedOrigins: readonly string[] };
 };
 
@@ -98,6 +103,7 @@ export function parseServerConfig(
     appUrl: env.APP_URL,
     timeZone: env.TZ,
     database: { url: env.DATABASE_URL },
+    session: { secret: env.SESSION_SECRET },
     cors: { allowedOrigins: env.CORS_ALLOWED_ORIGINS },
   };
 }

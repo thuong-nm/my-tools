@@ -17,17 +17,27 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hex Next Base",
+  title: "Text Share",
   description:
-    "Next.js 16 + Prisma 7 starter with ports & adapters and enforced layer boundaries.",
+    "Share text, JSON, XML, HTML or Markdown as a link — in the URL itself, or as a short link with an expiry.",
 };
+
+// Runs before first paint so a returning visitor's dark theme does not flash light. The class
+// on <html> is what styles/theme.css keys its palettes off.
+const THEME_SCRIPT = `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // The theme script below adds `dark` to this element before React hydrates, so its class
+    // is meant to differ from the server's. Suppression applies to this element only.
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${sans.variable} ${mono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

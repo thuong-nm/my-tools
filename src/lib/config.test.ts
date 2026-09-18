@@ -4,6 +4,7 @@ import { ConfigError, parseServerConfig } from "./config";
 
 const BASE = {
   DATABASE_URL: "postgresql://app:app@localhost:5433/app?schema=public",
+  SESSION_SECRET: "a-development-session-secret-at-least-32-chars",
 } as const;
 
 describe("CORS_ALLOWED_ORIGINS", () => {
@@ -44,4 +45,19 @@ describe("CORS_ALLOWED_ORIGINS", () => {
       ConfigError,
     );
   });
+});
+
+describe("SESSION_SECRET", () => {
+  it("is required: without it every session cookie would be signed with nothing", () => {
+    const { SESSION_SECRET: _omitted, ...withoutSecret } = BASE;
+    expect(() => parseServerConfig(withoutSecret)).toThrow(ConfigError);
+  });
+
+  // A blank value in `.env` means "not set", so it must fail the same way an absent one does.
+  it.each([["blank", ""], ["too short", "not-long-enough"]])(
+    "rejects a %s secret at startup rather than at the first sign-in",
+    (_label, secret) => {
+      expect(() => parseServerConfig({ ...BASE, SESSION_SECRET: secret })).toThrow(ConfigError);
+    },
+  );
 });

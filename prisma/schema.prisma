@@ -17,3 +17,57 @@ datasource db {
   provider = "postgresql"
   // Connection URL lives in prisma.config.ts (Prisma 7 convention).
 }
+
+/// Mirrors lib/domain/value-objects/content-format.ts. The editor's "Auto Detect" resolves to
+/// one of these in the browser, so it is never stored.
+enum ContentFormat {
+  PLAIN
+  MARKDOWN
+  JSON
+  XML
+  HTML
+  HTML_RENDER
+}
+
+model User {
+  id String @id @db.Uuid
+
+  /// Stored already normalised by the domain's Email value object, so this unique index is
+  /// case-correct without a functional index or a citext column.
+  email String @unique
+
+  /// Opaque, self-describing: `scrypt$N$r$p$salt$key`. Never a plaintext password.
+  passwordHash String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  shares TextShare[]
+}
+
+model TextShare {
+  id String @id @db.Uuid
+
+  /// The public half of a share link. Unique because the INSERT is the lock: a
+  /// check-then-act would let two callers claim the same code at READ COMMITTED.
+  code String @unique
+
+  /// Compressed and URL-safe already — the browser owns the codec, so this is opaque here.
+  content String
+  format  ContentFormat
+
+  /// Nullable: a share saved without signing in stays anonymous and belongs to no history.
+  /// Cascades because a share is personal content — closing an account takes it along.
+  ownerId String? @db.Uuid
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  /// For the purge job that reclaims expired rows.
+  @@index([expiresAt])
+
+  /// Serves history's "this owner's rows, newest first" in one index scan.
+  @@index([ownerId, createdAt])
+}
