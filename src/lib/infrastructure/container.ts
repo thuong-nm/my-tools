@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { serverConfig } from "@/lib/config";
 import type { TextShareRepository, UserRepository } from "@/lib/domain/ports/repositories";
 import { hashPassword, verifyPassword } from "./auth/password-hasher";
+import { alwaysHuman, recaptchaVerifier, type VerifyHuman } from "./bot-defense/recaptcha/verify-token";
 import { createPrismaClient, type PrismaDatabase } from "./prisma/client";
 import { textShareRepository, userRepository } from "./prisma/repositories";
 import { generateShareCode } from "./share-code";
@@ -29,6 +30,10 @@ export type Container = {
   // swapping, and rule 9 names it as the worked example of what does NOT earn an interface.
   readonly hashPassword: (password: string) => Promise<string>;
   readonly verifyPassword: (password: string, hash: string) => Promise<boolean>;
+
+  // Also a function rather than a port: no use case takes it, because "is this caller a bot" is
+  // an edge concern like CORS, not a business rule. Route handlers call it before the use case.
+  readonly verifyHuman: VerifyHuman;
 };
 
 let container: Container | undefined;
@@ -56,6 +61,12 @@ export function getContainer(): Container {
     generateShareCode,
     hashPassword,
     verifyPassword,
+    verifyHuman: config.recaptcha.enabled
+      ? recaptchaVerifier({
+          secretKey: config.recaptcha.secretKey,
+          minScore: config.recaptcha.minScore,
+        })
+      : alwaysHuman,
   };
 
   return container;

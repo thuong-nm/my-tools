@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentUser } from "@/app/_lib/current-user";
+import { recaptchaSiteKey } from "@/app/_lib/recaptcha";
 import { AuthForm } from "@/app/(auth)/_components/auth-form";
 import { safeNextPath } from "@/app/(auth)/_lib/next-path";
 import { MIN_PASSWORD_LENGTH } from "@/lib/domain/value-objects/password";
@@ -17,8 +18,12 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
 
   if (await currentUser()) redirect(next);
 
+  const siteKey = recaptchaSiteKey();
+
   return (
     <AuthForm
+      action="register"
+      {...(siteKey ? { siteKey } : {})}
       title="Create an account"
       description="Short links you save while signed in are kept in your history."
       endpoint="/api/auth/register"

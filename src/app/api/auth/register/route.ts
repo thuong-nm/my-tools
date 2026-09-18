@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { startSession } from "@/app/_lib/session";
 import { readJson } from "@/app/api/_lib/request";
+import { recaptchaTokenField, rejectIfNotHuman } from "@/app/api/_lib/require-human";
 import { badRequest, created, errorResponse } from "@/app/api/_lib/responses";
 import { registerUser } from "@/lib/application/use-cases/register-user";
 import { MAX_EMAIL_LENGTH } from "@/lib/domain/value-objects/email";
@@ -13,6 +14,7 @@ import { getContainer } from "@/lib/infrastructure/container";
 const registerSchema = z.object({
   email: z.string().max(MAX_EMAIL_LENGTH),
   password: z.string().max(MAX_PASSWORD_LENGTH),
+  recaptchaToken: recaptchaTokenField,
 });
 
 export async function POST(request: Request) {
@@ -20,9 +22,14 @@ export async function POST(request: Request) {
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error);
 
+  const rejected = await rejectIfNotHuman(request, "register", parsed.data.recaptchaToken);
+  if (rejected) return rejected;
+
   const { repositories, generateId, hashPassword } = getContainer();
 
-  const result = await registerUser(parsed.data, {
+  const { email, password } = parsed.data;
+
+  const result = await registerUser({ email, password }, {
     users: repositories.users,
     generateId,
     hashPassword,

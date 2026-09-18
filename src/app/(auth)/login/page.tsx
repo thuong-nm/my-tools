@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentUser } from "@/app/_lib/current-user";
+import { recaptchaSiteKey } from "@/app/_lib/recaptcha";
 import { AuthForm } from "@/app/(auth)/_components/auth-form";
 import { safeNextPath } from "@/app/(auth)/_lib/next-path";
 
@@ -16,8 +17,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   if (await currentUser()) redirect(next);
 
+  const siteKey = recaptchaSiteKey();
+
   return (
     <AuthForm
+      action="login"
+      {...(siteKey ? { siteKey } : {})}
       title="Sign in"
       description="Your saved short links live in your account history."
       endpoint="/api/auth/login"

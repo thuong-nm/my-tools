@@ -61,3 +61,38 @@ describe("SESSION_SECRET", () => {
     },
   );
 });
+
+describe("RECAPTCHA group", () => {
+  const KEYS = { RECAPTCHA_SITE_KEY: "site", RECAPTCHA_SECRET_KEY: "secret" };
+
+  it("is off when both halves are absent or blank", () => {
+    expect(parseServerConfig(BASE).recaptcha).toEqual({ enabled: false });
+    expect(
+      parseServerConfig({ ...BASE, RECAPTCHA_SITE_KEY: "", RECAPTCHA_SECRET_KEY: "" }).recaptcha,
+    ).toEqual({ enabled: false });
+  });
+
+  it("is on with a default score when both halves are present", () => {
+    expect(parseServerConfig({ ...BASE, ...KEYS }).recaptcha).toEqual({
+      enabled: true,
+      siteKey: "site",
+      secretKey: "secret",
+      minScore: 0.5,
+    });
+  });
+
+  it("fails loudly on a half-filled group rather than silently disabling the check", () => {
+    for (const half of [{ RECAPTCHA_SITE_KEY: "site" }, { RECAPTCHA_SECRET_KEY: "secret" }]) {
+      expect(() => parseServerConfig({ ...BASE, ...half })).toThrow(ConfigError);
+    }
+  });
+
+  it("rejects a score outside 0..1, which would switch the check off or on for everyone", () => {
+    expect(() => parseServerConfig({ ...BASE, ...KEYS, RECAPTCHA_MIN_SCORE: "1.5" })).toThrow(
+      ConfigError,
+    );
+    expect(() => parseServerConfig({ ...BASE, ...KEYS, RECAPTCHA_MIN_SCORE: "-1" })).toThrow(
+      ConfigError,
+    );
+  });
+});

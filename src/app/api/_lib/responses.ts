@@ -20,6 +20,9 @@ const WIRE_CODE: Readonly<Record<string, WireCode>> = {
   // 410 Gone is not one of the published eight, and an expired link is indistinguishable
   // from a missing one to a client: both mean "there is nothing here".
   TEXT_SHARE_EXPIRED: "NOT_FOUND",
+  // 403, not 401: the caller may be perfectly well authenticated and still look automated.
+  BOT_CHECK_FAILED: "FORBIDDEN",
+  BOT_CHECK_UNAVAILABLE: "UPSTREAM_UNAVAILABLE",
 };
 
 export function wireCode(code: string): WireCode {
@@ -43,6 +46,7 @@ export function statusForCode(code: string): number {
 
 // An ALLOW-list, not a filter: a repository may attach internal context for logs without knowing
 // this file exists. Add the keys your own errors carry.
+// `score` is deliberately NOT here: telling a bot how close it got is a tuning oracle.
 const PUBLIC_DETAIL_KEYS: ReadonlySet<string> = new Set(["fieldErrors"]);
 
 function publicDetails(

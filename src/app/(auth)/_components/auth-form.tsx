@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRecaptcha } from "@/components/use-recaptcha";
 import { ApiError, apiPost } from "@/lib/http/client";
 import type { FieldErrors } from "@/lib/http/envelope";
 
@@ -20,6 +21,8 @@ export function AuthForm({
   passwordHint,
   next,
   footer,
+  siteKey,
+  action,
 }: {
   readonly title: string;
   readonly description: string;
@@ -30,8 +33,11 @@ export function AuthForm({
   readonly passwordHint?: string;
   readonly next: string;
   readonly footer: ReactNode;
+  readonly siteKey?: string;
+  readonly action: "login" | "register";
 }) {
   const router = useRouter();
+  const { execute } = useRecaptcha(siteKey);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +52,7 @@ export function AuthForm({
     setFieldErrors(undefined);
 
     try {
-      await apiPost(endpoint, { email, password });
+      await apiPost(endpoint, { email, password, recaptchaToken: await execute(action) });
     } catch (cause) {
       // Reset here and not in a `finally`: `finally` also runs on the success path, which is a
       // full-page navigation still in flight, and would re-enable the button mid-load.
