@@ -7,7 +7,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RecaptchaNotice } from "@/components/recaptcha-notice";
 import { useRecaptcha } from "@/components/use-recaptcha";
 import { ApiError, apiPost } from "@/lib/http/client";
 import type { FieldErrors } from "@/lib/http/envelope";
@@ -110,10 +109,6 @@ export function AuthForm({
       </form>
 
       <p className="text-muted-foreground text-center text-sm">{footer}</p>
-
-      <div className="text-center">
-        <RecaptchaNotice enabled={siteKey !== undefined} />
-      </div>
     </main>
   );
 }

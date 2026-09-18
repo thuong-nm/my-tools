@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { RecaptchaNotice } from "@/components/recaptcha-notice";
 import { useRecaptcha } from "@/components/use-recaptcha";
 import type { TextShareDto } from "@/lib/application/dto/text-share";
 import type { UserDto } from "@/lib/application/dto/user";
@@ -158,9 +157,7 @@ export function TextShareTool({
         <PreviewPanel text={text} format={format} />
       </main>
 
-      <StatusBar characters={text.length} urlLength={url.length}>
-        <RecaptchaNotice enabled={siteKey !== undefined} />
-      </StatusBar>
+      <StatusBar characters={text.length} urlLength={url.length} />
       <Toast message={toast.message} />
     </div>
   );

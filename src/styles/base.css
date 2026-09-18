@@ -14,12 +14,6 @@
     opacity: 0.85;
   }
 
-  /* Hidden deliberately: the attribution in components/recaptcha-notice.tsx replaces it, which
-     is the alternative Google's terms allow. Removing that text would leave us out of compliance. */
-  .grecaptcha-badge {
-    visibility: hidden;
-  }
-
   * {
     @apply border-border outline-ring/50;
   }

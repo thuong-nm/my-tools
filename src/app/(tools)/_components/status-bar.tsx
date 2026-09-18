@@ -1,13 +1,9 @@
-import type { ReactNode } from "react";
-
 export function StatusBar({
   characters,
   urlLength,
-  children,
 }: {
   readonly characters: number;
   readonly urlLength: number;
-  readonly children?: ReactNode;
 }) {
   const ratio = characters > 0 ? Math.round((urlLength / characters) * 100) : null;
 
@@ -19,7 +15,6 @@ export function StatusBar({
           ? `URL: ${urlLength.toLocaleString()}${ratio === null ? "" : ` (${ratio}%)`}`
           : "URL: —"}
       </span>
-      {children !== undefined && <span className="ml-auto font-sans">{children}</span>}
     </footer>
   );
 }
