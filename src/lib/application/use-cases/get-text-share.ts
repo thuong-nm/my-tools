@@ -6,6 +6,8 @@ import { toTextShareDto, type TextShareDto } from "../dto/text-share";
 
 export type GetTextShareInput = {
   readonly code: string;
+  /** Absent for a signed-out reader. Only a match against `ownerId` unlocks the view count. */
+  readonly viewerId?: string;
 };
 
 export type GetTextShareDeps = {
@@ -40,5 +42,13 @@ export async function getTextShare(
     return err(domainError("TEXT_SHARE_EXPIRED", "That share link has expired."));
   }
 
-  return ok(toTextShareDto(share));
+  // Counted only for the owner: nobody else may learn it, so nobody else pays for the query.
+  if (input.viewerId === undefined || share.ownerId !== input.viewerId) {
+    return ok(toTextShareDto(share));
+  }
+
+  const views = await deps.shares.countUniqueViews(code.value);
+  if (isErr(views)) return views;
+
+  return ok(toTextShareDto(share, views.value));
 }

@@ -99,5 +99,44 @@ export function textShareRepository(db: PrismaDatabase): TextShareRepository {
 
       return ok(shares);
     },
+
+    // One statement, so there is no read-then-write race and no transaction to poison: the
+    // composite primary key rejects a repeat, and DO NOTHING turns that into zero rows affected
+    // rather than an error that would abort the surrounding transaction.
+    async recordUniqueView(code: ShareCode, viewerHash: string) {
+      try {
+        await db.$executeRaw`
+          INSERT INTO "TextShareView" ("shareId", "viewerHash")
+          SELECT "id", ${viewerHash} FROM "TextShare" WHERE "code" = ${code}
+          ON CONFLICT DO NOTHING
+        `;
+        return ok(undefined);
+      } catch (cause) {
+        return err(unavailable("while recording a view", cause));
+      }
+    },
+
+    async countUniqueViews(code: ShareCode) {
+      try {
+        return ok(await db.textShareView.count({ where: { share: { code } } }));
+      } catch (cause) {
+        return err(unavailable("while counting views", cause));
+      }
+    },
+
+    // `updateMany` rather than `update`: ownership belongs in the WHERE clause, and the affected
+    // count is what tells us whether it matched without a second read.
+    async renameByOwner(code: ShareCode, ownerId: UserId, title: string | undefined) {
+      try {
+        const changed = await db.textShare.updateMany({
+          where: { code, ownerId },
+          data: { title: title ?? null },
+        });
+
+        return ok(changed.count > 0);
+      } catch (cause) {
+        return err(unavailable("while renaming a share", cause));
+      }
+    },
   };
 }

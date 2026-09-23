@@ -4,7 +4,14 @@ import { errorResponse } from "@/app/api/_lib/responses";
 import { getContainer } from "@/lib/infrastructure/container";
 
 /** The actions a token may be minted for. The adapter rejects a token issued for another one. */
-export const RECAPTCHA_ACTIONS = ["login", "register", "save_share"] as const;
+export const RECAPTCHA_ACTIONS = [
+  "login",
+  "register",
+  "save_share",
+  "forgot_password",
+  "reset_password",
+  "rename_share",
+] as const;
 
 export type RecaptchaAction = (typeof RECAPTCHA_ACTIONS)[number];
 

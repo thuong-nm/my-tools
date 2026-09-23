@@ -12,6 +12,7 @@ import { AppHeader } from "./app-header";
 export function ToolPage({
   tool,
   user,
+  siteKey,
   inputLabel,
   placeholder,
   value,
@@ -21,6 +22,7 @@ export function ToolPage({
 }: {
   readonly tool: ToolId;
   readonly user?: UserDto;
+  readonly siteKey?: string;
   readonly inputLabel: string;
   readonly placeholder: string;
   readonly value: string;
@@ -30,7 +32,12 @@ export function ToolPage({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <AppHeader tool={tool} {...(user ? { user } : {})} {...(actions ? { actions } : {})} />
+      <AppHeader
+        tool={tool}
+        {...(user ? { user } : {})}
+        {...(siteKey ? { siteKey } : {})}
+        {...(actions ? { actions } : {})}
+      />
 
       <main className="divide-border flex min-h-0 flex-1 flex-col divide-y md:flex-row md:divide-x md:divide-y-0">
         <section className="flex min-h-0 flex-1 flex-col gap-2 p-4">

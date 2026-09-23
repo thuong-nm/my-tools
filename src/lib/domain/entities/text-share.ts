@@ -4,6 +4,7 @@ import { isErr, ok, type Result } from "../shared/result";
 import { contentFormat, type ContentFormat } from "../value-objects/content-format";
 import { expiryFrom, retention } from "../value-objects/retention";
 import { shareCode, type ShareCode } from "../value-objects/share-code";
+import { shareTitle, type ShareTitle } from "../value-objects/share-title";
 import { sharedText, type SharedText } from "../value-objects/shared-text";
 
 export type CreateTextShareProps = {
@@ -25,11 +26,13 @@ export type RestoreTextShareProps = {
   readonly createdAt: Date;
   readonly expiresAt: Date;
   readonly ownerId?: string;
+  readonly title?: string;
 };
 
-// Write-once: a share has no behaviour that changes it, so there is no state machine and no
-// transition table. Expiry is derived from the clock on every read rather than stored as a
-// status, which would go stale the moment nothing runs to update it.
+// The shared CONTENT is write-once — there is no behaviour that rewrites it, so no state machine
+// and no transition table. The title is the one mutable part, and it changes only through
+// `rename`. Expiry is derived from the clock on every read rather than stored as a status, which
+// would go stale the moment nothing runs to update it.
 export class TextShare {
   private constructor(
     readonly id: TextShareId,
@@ -40,7 +43,21 @@ export class TextShare {
     readonly createdAt: Date,
     readonly expiresAt: Date,
     readonly ownerId: UserId | undefined,
+    private _title: ShareTitle | undefined,
   ) {}
+
+  get title(): ShareTitle | undefined {
+    return this._title;
+  }
+
+  /** Blank clears it. Only the owner may reach this — the repository enforces that in SQL. */
+  rename(title: string): Result<void, ValidationError> {
+    const next = shareTitle(title);
+    if (isErr(next)) return next;
+
+    this._title = next.value;
+    return ok(undefined);
+  }
 
   static create(props: CreateTextShareProps): Result<TextShare, ValidationError> {
     const code = shareCode(props.code);
@@ -64,6 +81,7 @@ export class TextShare {
         props.now,
         expiryFrom(props.now, window.value),
         props.ownerId === undefined ? undefined : asUserId(props.ownerId),
+        undefined,
       ),
     );
   }
@@ -80,6 +98,9 @@ export class TextShare {
     const format = contentFormat(props.format);
     if (isErr(format)) return format;
 
+    const title = shareTitle(props.title ?? "");
+    if (isErr(title)) return title;
+
     return ok(
       new TextShare(
         asTextShareId(props.id),
@@ -89,6 +110,7 @@ export class TextShare {
         props.createdAt,
         props.expiresAt,
         props.ownerId === undefined ? undefined : asUserId(props.ownerId),
+        title.value,
       ),
     );
   }
