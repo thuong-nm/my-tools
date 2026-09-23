@@ -47,6 +47,20 @@ const serverEnvSchema = z.object({
   RECAPTCHA_SITE_KEY: z.string().min(1).optional(),
   RECAPTCHA_SECRET_KEY: z.string().min(1).optional(),
   RECAPTCHA_MIN_SCORE: z.coerce.number().min(0).max(1).default(0.5),
+
+  // Another GROUP: all five together, or all blank and password reset reports itself as
+  // unconfigured rather than pretending an email went out.
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(465),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  SMTP_FROM: z.string().min(1).optional(),
+  /** Display name on the From header. Outside the group: it has a default, so it is never
+   *  half-filled, and a bare address makes mail clients show an empty sender. */
+  SMTP_FROM_NAME: z.string().min(1).default("Text Share"),
+
+  /** How long an emailed reset link stays usable. */
+  PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
 });
 
 type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -61,6 +75,18 @@ export type RecaptchaConfig =
       readonly minScore: number;
     };
 
+export type SmtpConfigValue =
+  | { readonly enabled: false }
+  | {
+      readonly enabled: true;
+      readonly host: string;
+      readonly port: number;
+      readonly user: string;
+      readonly password: string;
+      readonly from: string;
+      readonly fromName: string;
+    };
+
 export type ServerConfig = {
   readonly nodeEnv: ServerEnv["NODE_ENV"];
   readonly isProduction: boolean;
@@ -70,6 +96,8 @@ export type ServerConfig = {
   readonly session: { readonly secret: string };
   readonly cors: { readonly allowedOrigins: readonly string[] };
   readonly recaptcha: RecaptchaConfig;
+  readonly smtp: SmtpConfigValue;
+  readonly passwordResetTtlMs: number;
 };
 
 export class ConfigError extends Error {
@@ -124,6 +152,24 @@ export function parseServerConfig(
     );
   }
 
+  const smtpParts = {
+    host: env.SMTP_HOST,
+    user: env.SMTP_USER,
+    password: env.SMTP_PASSWORD,
+    from: env.SMTP_FROM,
+  };
+  const setParts = Object.entries(smtpParts).filter(([, value]) => value !== undefined);
+  if (setParts.length !== 0 && setParts.length !== 4) {
+    const missing = Object.entries(smtpParts)
+      .filter(([, value]) => value === undefined)
+      .map(([key]) => `SMTP_${key.toUpperCase()}`);
+
+    throw new ConfigError(
+      "Invalid environment configuration:\n" +
+        `  - the SMTP group is half-filled; missing ${missing.join(", ")}.`,
+    );
+  }
+
   return {
     nodeEnv: env.NODE_ENV,
     isProduction: env.NODE_ENV === "production",
@@ -136,6 +182,22 @@ export function parseServerConfig(
       siteKey !== undefined && secretKey !== undefined
         ? { enabled: true, siteKey, secretKey, minScore: env.RECAPTCHA_MIN_SCORE }
         : { enabled: false },
+    smtp:
+      smtpParts.host !== undefined &&
+      smtpParts.user !== undefined &&
+      smtpParts.password !== undefined &&
+      smtpParts.from !== undefined
+        ? {
+            enabled: true,
+            host: smtpParts.host,
+            port: env.SMTP_PORT,
+            user: smtpParts.user,
+            password: smtpParts.password,
+            from: smtpParts.from,
+            fromName: env.SMTP_FROM_NAME,
+          }
+        : { enabled: false },
+    passwordResetTtlMs: env.PASSWORD_RESET_TTL_MINUTES * 60 * 1000,
   };
 }
 

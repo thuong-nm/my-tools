@@ -32,6 +32,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       next={next}
       footer={
         <>
+          <Link href="/forgot-password" className="text-primary underline underline-offset-4">
+            Forgot your password?
+          </Link>
+          <br />
           No account yet?{" "}
           <Link href="/register" className="text-primary underline underline-offset-4">
             Create one

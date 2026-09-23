@@ -42,7 +42,8 @@ model User {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
-  shares TextShare[]
+  shares         TextShare[]
+  passwordResets PasswordReset[]
 }
 
 model TextShare {
@@ -65,9 +66,46 @@ model TextShare {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
+  views TextShareView[]
+
   /// For the purge job that reclaims expired rows.
   @@index([expiresAt])
-
   /// Serves history's "this owner's rows, newest first" in one index scan.
   @@index([ownerId, createdAt])
+}
+
+/// A password reset link, stored so it can be single-use: the emailed link outlives the reset
+/// otherwise, and mailboxes forward and archive.
+model PasswordReset {
+  /// SHA-256 of the emailed token. The plaintext is never stored, so reading this table does
+  /// not hand out working reset links.
+  tokenHash String @id
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime  @db.Timestamptz(6)
+  /// NULL means pending. Set once, on the reset that consumes it.
+  usedAt    DateTime? @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  /// Serves "retire this account's outstanding links" when a new one is requested.
+  @@index([userId])
+}
+
+/// One row per distinct viewer of a share. The owner's own views are never recorded, so the
+/// count means "other people", which is the only reading that is useful to the owner.
+model TextShareView {
+  shareId String    @db.Uuid
+  share   TextShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+  /// sha256(secret + code + ip + user-agent). The raw IP is never stored, and the per-code
+  /// salt means the same visitor is not linkable across two different shares.
+  viewerHash String
+
+  firstSeenAt DateTime @default(now()) @db.Timestamptz(6)
+
+  /// The composite primary key IS the dedup lock: a second view inserts nothing.
+  @@id([shareId, viewerHash])
 }

@@ -23,6 +23,11 @@ const WIRE_CODE: Readonly<Record<string, WireCode>> = {
   // 403, not 401: the caller may be perfectly well authenticated and still look automated.
   BOT_CHECK_FAILED: "FORBIDDEN",
   BOT_CHECK_UNAVAILABLE: "UPSTREAM_UNAVAILABLE",
+  // A spent or stale link is indistinguishable from a wrong one to the person holding it, and
+  // all three mean the same thing: ask for a new link.
+  RESET_TOKEN_EXPIRED: "NOT_FOUND",
+  RESET_TOKEN_ALREADY_USED: "NOT_FOUND",
+  NOTIFIER_UNAVAILABLE: "UPSTREAM_UNAVAILABLE",
 };
 
 export function wireCode(code: string): WireCode {

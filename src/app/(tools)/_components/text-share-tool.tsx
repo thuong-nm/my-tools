@@ -43,6 +43,8 @@ export function TextShareTool({
   const [linkError, setLinkError] = useState<string | null>(null);
   const [retention, setRetention] = useState<Retention>("ONE_MONTH");
   const [savedCode, setSavedCode] = useState<string | null>(initialShare?.code ?? null);
+  // Only ever set from a server response, so it appears exactly when the reader owns the share.
+  const [viewCount, setViewCount] = useState<number | undefined>(initialShare?.viewCount);
 
   const toast = useToast();
   const { save, saving } = useSaveShare();
@@ -77,6 +79,8 @@ export function TextShareTool({
   const handleTextChange = (next: string) => {
     setLinkError(null);
     setSavedCode(null);
+    // The edited text is no longer the share the count belongs to.
+    setViewCount(undefined);
     setText(next);
   };
 
@@ -119,6 +123,7 @@ export function TextShareTool({
     }
 
     setSavedCode(result.code);
+    setViewCount(result.viewCount ?? 0);
     replaceUrl(sharePath(result.code));
 
     const copied = await copyToClipboard(window.location.href);
@@ -133,6 +138,7 @@ export function TextShareTool({
         actions={
           <TextShareActions
             url={url}
+            {...(savedCode !== null && viewCount !== undefined ? { viewCount } : {})}
             choice={choice}
             onChoiceChange={handleChoiceChange}
             onCopy={() => void handleCopy()}

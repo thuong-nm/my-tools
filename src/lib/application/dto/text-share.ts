@@ -10,6 +10,8 @@ export type TextShareDto = {
   readonly format: ContentFormat;
   readonly createdAtUtc: string;
   readonly expiresAtUtc: string;
+  /** Distinct viewers, excluding the owner. Omitted entirely unless the reader owns the share. */
+  readonly viewCount?: number;
 };
 
 // A history row deliberately omits `content`: the payload is opaque here and can run to
@@ -23,8 +25,9 @@ export type TextShareSummaryDto = {
   readonly expired: boolean;
 };
 
-export function toTextShareDto(share: TextShare): TextShareDto {
+export function toTextShareDto(share: TextShare, viewCount?: number): TextShareDto {
   return {
+    ...(viewCount === undefined ? {} : { viewCount }),
     code: share.code,
     content: share.content,
     format: share.format,

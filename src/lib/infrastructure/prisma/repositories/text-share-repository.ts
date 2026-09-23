@@ -99,5 +99,29 @@ export function textShareRepository(db: PrismaDatabase): TextShareRepository {
 
       return ok(shares);
     },
+
+    // One statement, so there is no read-then-write race and no transaction to poison: the
+    // composite primary key rejects a repeat, and DO NOTHING turns that into zero rows affected
+    // rather than an error that would abort the surrounding transaction.
+    async recordUniqueView(code: ShareCode, viewerHash: string) {
+      try {
+        await db.$executeRaw`
+          INSERT INTO "TextShareView" ("shareId", "viewerHash")
+          SELECT "id", ${viewerHash} FROM "TextShare" WHERE "code" = ${code}
+          ON CONFLICT DO NOTHING
+        `;
+        return ok(undefined);
+      } catch (cause) {
+        return err(unavailable("while recording a view", cause));
+      }
+    },
+
+    async countUniqueViews(code: ShareCode) {
+      try {
+        return ok(await db.textShareView.count({ where: { share: { code } } }));
+      } catch (cause) {
+        return err(unavailable("while counting views", cause));
+      }
+    },
   };
 }

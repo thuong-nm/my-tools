@@ -15,6 +15,7 @@ export type FakeTextShareRepository = TextShareRepository & {
 export function fakeTextShareRepository(): FakeTextShareRepository {
   const rows = new Map<string, TextShare>();
   let forcedConflicts = 0;
+  const viewers = new Map<string, Set<string>>();
   let readError: RepositoryError | undefined;
 
   return {
@@ -59,6 +60,22 @@ export function fakeTextShareRepository(): FakeTextShareRepository {
         .slice(0, limit);
 
       return ok(owned);
+    },
+
+    async recordUniqueView(code: ShareCode, viewerHash: string) {
+      const share = rows.get(code);
+      if (!share) return ok(undefined);
+
+      // A Set, so a repeat view is a no-op exactly as the composite key makes it in Postgres.
+      const seen = viewers.get(code) ?? new Set<string>();
+      seen.add(viewerHash);
+      viewers.set(code, seen);
+
+      return ok(undefined);
+    },
+
+    async countUniqueViews(code: ShareCode) {
+      return ok(viewers.get(code)?.size ?? 0);
     },
   };
 }
