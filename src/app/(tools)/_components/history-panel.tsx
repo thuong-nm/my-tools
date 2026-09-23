@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { History, X } from "lucide-react";
+import { History, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -13,8 +13,9 @@ import { ApiError, apiFetch } from "@/lib/http/client";
 import { formatTimestamp } from "@/app/(tools)/_lib/format-timestamp";
 import { sharePath } from "@/app/(tools)/_lib/routes";
 import { CopyLinkButton } from "./copy-link-button";
+import { TitleDialog } from "./title-dialog";
 
-export function HistoryPanel() {
+export function HistoryPanel({ siteKey }: { readonly siteKey?: string }) {
   return (
     <Dialog.Root>
       <Dialog.Trigger
@@ -39,7 +40,7 @@ export function HistoryPanel() {
           {/* Mounted only while open, so a fresh fetch runs on every open and the loading state
               is the absence of data rather than a flag an effect has to set. */}
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <HistoryList />
+            <HistoryList {...(siteKey ? { siteKey } : {})} />
           </div>
         </Dialog.Popup>
       </Dialog.Portal>
@@ -47,9 +48,18 @@ export function HistoryPanel() {
   );
 }
 
-function HistoryList() {
+function HistoryList({ siteKey }: { readonly siteKey?: string }) {
   const [shares, setShares] = useState<readonly TextShareSummaryDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Patched in place rather than refetched: the list is already correct apart from one field,
+  // and a refetch would scroll-jump the panel the person is reading.
+  const applyRename = (code: string, title: string | undefined) =>
+    setShares((current) =>
+      current?.map((row) =>
+        row.code === code ? { ...row, ...(title === undefined ? {} : { title }) } : row,
+      ) ?? current,
+    );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -104,7 +114,7 @@ function HistoryList() {
             className="focus-visible:ring-ring/50 flex min-w-0 flex-1 flex-col gap-1 rounded-lg px-2 py-2 text-left focus-visible:ring-3 focus-visible:outline-none"
           >
             <span className="flex items-center gap-2">
-              <span className="truncate font-mono text-sm">{share.code}</span>
+              <span className="truncate text-sm font-medium">{share.title ?? share.code}</span>
               <Badge variant="outline">{share.format}</Badge>
               {/* Trusted from the server: the viewer's device clock may disagree with the
                   expiry the link is actually served against. */}
@@ -112,6 +122,7 @@ function HistoryList() {
             </span>
 
             <span className="text-muted-foreground text-xs">
+              {share.title !== undefined && <span className="font-mono">{share.code} · </span>}
               Saved <time dateTime={share.createdAtUtc}>{formatTimestamp(share.createdAtUtc)}</time>
               {" · "}
               {share.expired ? "Expired" : "Expires"}{" "}
@@ -119,9 +130,48 @@ function HistoryList() {
             </span>
           </Dialog.Close>
 
+          <RenameButton
+            share={share}
+            {...(siteKey ? { siteKey } : {})}
+            onRenamed={applyRename}
+          />
           <CopyLinkButton path={sharePath(share.code)} />
         </li>
       ))}
     </ul>
+  );
+}
+
+function RenameButton({
+  share,
+  siteKey,
+  onRenamed,
+}: {
+  readonly share: TextShareSummaryDto;
+  readonly siteKey?: string;
+  readonly onRenamed: (code: string, title: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`Rename ${share.title ?? share.code}`}
+        title="Rename"
+        onClick={() => setOpen(true)}
+      >
+        <Pencil />
+      </Button>
+      <TitleDialog
+        code={share.code}
+        open={open}
+        {...(share.title === undefined ? {} : { initialTitle: share.title })}
+        {...(siteKey ? { siteKey } : {})}
+        onOpenChange={setOpen}
+        onSaved={(title) => onRenamed(share.code, title)}
+      />
+    </>
   );
 }

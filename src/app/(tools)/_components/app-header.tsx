@@ -13,10 +13,13 @@ export function AppHeader({
   tool,
   actions,
   user,
+  siteKey,
 }: {
   readonly tool: ToolId;
   readonly actions?: ReactNode;
   readonly user?: UserDto;
+  /** Only needed so the history panel can mint a token when renaming. */
+  readonly siteKey?: string;
 }) {
   return (
     <header className="border-border bg-background flex flex-wrap items-center gap-x-6 gap-y-2 border-b px-4 py-2.5">
@@ -29,7 +32,7 @@ export function AppHeader({
 
       <div className="flex items-center gap-1">
         <ThemeToggle />
-        <AccountMenu user={user} />
+        <AccountMenu user={user} {...(siteKey ? { siteKey } : {})} />
       </div>
     </header>
   );

@@ -77,5 +77,15 @@ export function fakeTextShareRepository(): FakeTextShareRepository {
     async countUniqueViews(code: ShareCode) {
       return ok(viewers.get(code)?.size ?? 0);
     },
+
+    async renameByOwner(code: ShareCode, ownerId: UserId, title: string | undefined) {
+      const share = rows.get(code);
+      if (!share || share.ownerId !== ownerId) return ok(false);
+
+      const renamed = share.rename(title ?? "");
+      if (!renamed.ok) return ok(false);
+
+      return ok(true);
+    },
   };
 }

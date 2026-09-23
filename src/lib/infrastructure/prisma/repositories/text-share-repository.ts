@@ -123,5 +123,20 @@ export function textShareRepository(db: PrismaDatabase): TextShareRepository {
         return err(unavailable("while counting views", cause));
       }
     },
+
+    // `updateMany` rather than `update`: ownership belongs in the WHERE clause, and the affected
+    // count is what tells us whether it matched without a second read.
+    async renameByOwner(code: ShareCode, ownerId: UserId, title: string | undefined) {
+      try {
+        const changed = await db.textShare.updateMany({
+          where: { code, ownerId },
+          data: { title: title ?? null },
+        });
+
+        return ok(changed.count > 0);
+      } catch (cause) {
+        return err(unavailable("while renaming a share", cause));
+      }
+    },
   };
 }

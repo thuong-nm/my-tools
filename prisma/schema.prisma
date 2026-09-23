@@ -57,6 +57,9 @@ model TextShare {
   content String
   format  ContentFormat
 
+  /// The owner's label, shown to everyone who opens the link. NULL until one is set.
+  title String?
+
   /// Nullable: a share saved without signing in stays anonymous and belongs to no history.
   /// Cascades because a share is personal content — closing an account takes it along.
   ownerId String? @db.Uuid

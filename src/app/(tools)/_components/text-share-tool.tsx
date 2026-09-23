@@ -22,6 +22,7 @@ import { EditorPanel } from "./editor-panel";
 import { Panel } from "./panel";
 import { PreviewPanel } from "./preview-panel";
 import { StatusBar } from "./status-bar";
+import { TitleDialog } from "./title-dialog";
 import { Toast } from "./toast";
 import { TextShareActions } from "./tool-header";
 
@@ -45,6 +46,8 @@ export function TextShareTool({
   const [savedCode, setSavedCode] = useState<string | null>(initialShare?.code ?? null);
   // Only ever set from a server response, so it appears exactly when the reader owns the share.
   const [viewCount, setViewCount] = useState<number | undefined>(initialShare?.viewCount);
+  const [title, setTitle] = useState<string | undefined>(initialShare?.title);
+  const [namingCode, setNamingCode] = useState<string | null>(null);
 
   const toast = useToast();
   const { save, saving } = useSaveShare();
@@ -79,8 +82,9 @@ export function TextShareTool({
   const handleTextChange = (next: string) => {
     setLinkError(null);
     setSavedCode(null);
-    // The edited text is no longer the share the count belongs to.
+    // The edited text is no longer the share the count or the title belong to.
     setViewCount(undefined);
+    setTitle(undefined);
     setText(next);
   };
 
@@ -124,10 +128,15 @@ export function TextShareTool({
 
     setSavedCode(result.code);
     setViewCount(result.viewCount ?? 0);
+    setTitle(result.title);
     replaceUrl(sharePath(result.code));
 
     const copied = await copyToClipboard(window.location.href);
     toast.show(copied ? "Saved — link copied" : "Saved — the link is in the address bar");
+
+    // Only for a signed-in owner: a share saved anonymously belongs to no history, so there is
+    // nowhere for a title to be useful.
+    if (user) setNamingCode(result.code);
   };
 
   return (
@@ -135,6 +144,7 @@ export function TextShareTool({
       <AppHeader
         tool="share"
         {...(user ? { user } : {})}
+        {...(siteKey ? { siteKey } : {})}
         actions={
           <TextShareActions
             url={url}
@@ -164,6 +174,17 @@ export function TextShareTool({
       </main>
 
       <StatusBar characters={text.length} urlLength={url.length} />
+      {savedCode !== null && (
+        <TitleDialog
+          code={savedCode}
+          open={namingCode === savedCode}
+          {...(title === undefined ? {} : { initialTitle: title })}
+          {...(siteKey ? { siteKey } : {})}
+          onOpenChange={(next) => setNamingCode(next ? savedCode : null)}
+          onSaved={setTitle}
+        />
+      )}
+
       <Toast message={toast.message} />
     </div>
   );

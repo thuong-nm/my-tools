@@ -37,6 +37,17 @@ export type TextShareRepository = {
   recordUniqueView(code: ShareCode, viewerHash: string): Promise<Result<void, RepositoryError>>;
 
   countUniqueViews(code: ShareCode): Promise<Result<number, RepositoryError>>;
+
+  /**
+   * Ownership is part of the WHERE clause, not a check the caller makes first: reading then
+   * writing would let a share change hands between the two statements.
+   * Answers false when no row matched — unknown code, or not this owner's.
+   */
+  renameByOwner(
+    code: ShareCode,
+    ownerId: UserId,
+    title: string | undefined,
+  ): Promise<Result<boolean, RepositoryError>>;
 };
 
 export type UserRepository = {

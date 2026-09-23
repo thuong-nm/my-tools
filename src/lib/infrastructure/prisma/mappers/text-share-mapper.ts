@@ -14,6 +14,7 @@ export function toDomain(row: TextShareRow): Result<TextShare, ValidationError> 
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
     ...(row.ownerId === null ? {} : { ownerId: row.ownerId }),
+    ...(row.title === null ? {} : { title: row.title }),
   });
 }
 
@@ -26,5 +27,6 @@ export function toPersistence(share: TextShare) {
     createdAt: share.createdAt,
     expiresAt: share.expiresAt,
     ownerId: share.ownerId ?? null,
+    title: share.title ?? null,
   };
 }

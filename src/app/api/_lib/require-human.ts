@@ -10,6 +10,7 @@ export const RECAPTCHA_ACTIONS = [
   "save_share",
   "forgot_password",
   "reset_password",
+  "rename_share",
 ] as const;
 
 export type RecaptchaAction = (typeof RECAPTCHA_ACTIONS)[number];

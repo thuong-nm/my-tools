@@ -9,10 +9,22 @@ import { getTextShare } from "@/lib/application/use-cases/get-text-share";
 import { recordShareView } from "@/lib/application/use-cases/record-share-view";
 import { getContainer } from "@/lib/infrastructure/container";
 
-export const metadata: Metadata = {
-  title: "Shared text",
-  robots: { index: false },
-};
+// The title is public by design, so it goes in the tab and the link preview. `robots` stays on
+// noindex: a share is unlisted, and a readable title must not make it findable.
+export async function generateMetadata({ params }: PageProps<"/s/[code]">): Promise<Metadata> {
+  const { code } = await params;
+
+  const { repositories, now } = getContainer();
+  const result = await getTextShare({ code }, { shares: repositories.textShares, now });
+
+  const title = result.ok ? result.value.title : undefined;
+
+  return {
+    title: title ?? "Shared text",
+    ...(title === undefined ? {} : { openGraph: { title } }),
+    robots: { index: false },
+  };
+}
 
 /** Everything else — a database that did not answer, a corrupt row — is a 500, not a 404. */
 const MEANS_NOTHING_HERE: ReadonlySet<string> = new Set([
