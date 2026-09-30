@@ -156,6 +156,7 @@ export function TextShareTool({
             onRetentionChange={setRetention}
             onSave={() => void handleSave()}
             saving={saving}
+            viewingSaved={savedCode !== null}
           />
         }
       />

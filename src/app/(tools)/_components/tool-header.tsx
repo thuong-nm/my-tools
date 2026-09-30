@@ -1,11 +1,13 @@
 "use client";
 
-import { Copy, Eye } from "lucide-react";
+import { Copy, Eye, FilePlus2 } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/utils";
 import type { Retention } from "@/lib/domain/value-objects/retention";
 import { FORMAT_CHOICES, FORMAT_LABELS, type FormatChoice } from "@/app/(tools)/_lib/format-choice";
+import { TOOL_PATH } from "@/app/(tools)/_lib/routes";
 import { SaveControls } from "./save-controls";
 import { ToolSelect } from "./tool-select";
 
@@ -20,6 +22,7 @@ export function TextShareActions({
   onRetentionChange,
   onSave,
   saving,
+  viewingSaved,
 }: {
   readonly url: string;
   readonly viewCount?: number;
@@ -30,6 +33,8 @@ export function TextShareActions({
   readonly onRetentionChange: (next: Retention) => void;
   readonly onSave: () => void;
   readonly saving: boolean;
+  /** True while a saved link is what is on screen, unedited. */
+  readonly viewingSaved: boolean;
 }) {
   return (
     <>
@@ -43,12 +48,23 @@ export function TextShareActions({
         onChange={onChoiceChange}
       />
 
-      <SaveControls
-        retention={retention}
-        onRetentionChange={onRetentionChange}
-        onSave={onSave}
-        saving={saving}
-      />
+      <div className="flex items-center gap-1.5">
+        <SaveControls
+          retention={retention}
+          onRetentionChange={onRetentionChange}
+          onSave={onSave}
+          saving={saving}
+        />
+
+        {/* Shown only while the editor still matches the saved link, so leaving for a blank one
+            can never discard an edit — and a plain link, so it opens in a new tab on demand. */}
+        {viewingSaved && (
+          <Button variant="outline" render={<Link href={TOOL_PATH} />} title="Start a new document">
+            <FilePlus2 />
+            New
+          </Button>
+        )}
+      </div>
     </>
   );
 }
