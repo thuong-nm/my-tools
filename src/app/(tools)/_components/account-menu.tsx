@@ -8,7 +8,13 @@ import type { UserDto } from "@/lib/application/dto/user";
 import { useSignOut } from "@/app/(tools)/_hooks/use-sign-out";
 import { HistoryPanel } from "./history-panel";
 
-export function AccountMenu({ user }: { readonly user?: UserDto }) {
+export function AccountMenu({
+  user,
+  siteKey,
+}: {
+  readonly user?: UserDto;
+  readonly siteKey?: string;
+}) {
   const { signOut, signingOut } = useSignOut();
 
   if (!user) {
@@ -26,7 +32,7 @@ export function AccountMenu({ user }: { readonly user?: UserDto }) {
 
   return (
     <div className="flex items-center gap-1">
-      <HistoryPanel />
+      <HistoryPanel {...(siteKey ? { siteKey } : {})} />
       <Initial email={user.email} />
       <Button
         variant="ghost"

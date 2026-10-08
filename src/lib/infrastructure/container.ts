@@ -1,11 +1,23 @@
 import { randomUUID } from "node:crypto";
 
 import { serverConfig } from "@/lib/config";
-import type { TextShareRepository, UserRepository } from "@/lib/domain/ports/repositories";
+import type { Notifier } from "@/lib/domain/ports/notifier";
+import type {
+  PasswordResetRepository,
+  TextShareRepository,
+  UserRepository,
+} from "@/lib/domain/ports/repositories";
+import { isProbablyBot, viewerHasher, type ViewerIdentity } from "./analytics/viewer-hash";
 import { hashPassword, verifyPassword } from "./auth/password-hasher";
+import { generateResetToken, hashResetToken } from "./auth/reset-token";
 import { alwaysHuman, recaptchaVerifier, type VerifyHuman } from "./bot-defense/recaptcha/verify-token";
 import { createPrismaClient, type PrismaDatabase } from "./prisma/client";
-import { textShareRepository, userRepository } from "./prisma/repositories";
+import { smtpNotifier, unconfiguredNotifier } from "./notification/smtp/smtp-notifier";
+import {
+  passwordResetRepository,
+  textShareRepository,
+  userRepository,
+} from "./prisma/repositories";
 import { generateShareCode } from "./share-code";
 
 // The only module allowed to construct an adapter, which is what makes "swap the payment vendor"
@@ -19,7 +31,12 @@ export type Container = {
   readonly repositories: {
     readonly textShares: TextShareRepository;
     readonly users: UserRepository;
+    readonly passwordResets: PasswordResetRepository;
   };
+
+  // A real port (rule 9's table names `notification` as a boundary), so the vendor stays in
+  // infrastructure/notification and nothing above here knows SMTP exists.
+  readonly notifier: Notifier;
 
   // Injected, not called in the domain: non-determinism lives out here (rule 1).
   readonly now: () => Date;
@@ -34,6 +51,15 @@ export type Container = {
   // Also a function rather than a port: no use case takes it, because "is this caller a bot" is
   // an edge concern like CORS, not a business rule. Route handlers call it before the use case.
   readonly verifyHuman: VerifyHuman;
+
+  // Derived from the session secret rather than its own variable: one fewer thing to configure,
+  // and the domain-separation string keeps the two uses from ever producing the same digest.
+  readonly hashViewer: (code: string, identity: ViewerIdentity) => string;
+  readonly isProbablyBot: (userAgent: string | undefined) => boolean;
+
+  readonly generateResetToken: () => { readonly token: string; readonly tokenHash: string };
+  readonly hashResetToken: (token: string) => string;
+  readonly passwordResetTtlMs: number;
 };
 
 let container: Container | undefined;
@@ -55,7 +81,9 @@ export function getContainer(): Container {
     repositories: {
       textShares: textShareRepository(db),
       users: userRepository(db),
+      passwordResets: passwordResetRepository(db),
     },
+    notifier: config.smtp.enabled ? smtpNotifier(config.smtp) : unconfiguredNotifier,
     now: () => new Date(),
     generateId: () => randomUUID(),
     generateShareCode,
@@ -67,6 +95,11 @@ export function getContainer(): Container {
           minScore: config.recaptcha.minScore,
         })
       : alwaysHuman,
+    hashViewer: viewerHasher(config.session.secret),
+    isProbablyBot,
+    generateResetToken,
+    hashResetToken,
+    passwordResetTtlMs: config.passwordResetTtlMs,
   };
 
   return container;

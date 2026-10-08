@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import type { UserDto } from "@/lib/application/dto/user";
 import type { ToolId } from "@/app/(tools)/_lib/tool-registry";
 import { AppHeader } from "./app-header";
+import { ResizableSplit } from "./resizable-split";
 
 /** The two-pane shell every utility tool shares: an input on the left, its reading on the right. */
 export function ToolPage({
   tool,
   user,
+  siteKey,
   inputLabel,
   placeholder,
   value,
@@ -21,6 +23,7 @@ export function ToolPage({
 }: {
   readonly tool: ToolId;
   readonly user?: UserDto;
+  readonly siteKey?: string;
   readonly inputLabel: string;
   readonly placeholder: string;
   readonly value: string;
@@ -30,25 +33,33 @@ export function ToolPage({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <AppHeader tool={tool} {...(user ? { user } : {})} {...(actions ? { actions } : {})} />
+      <AppHeader
+        tool={tool}
+        {...(user ? { user } : {})}
+        {...(siteKey ? { siteKey } : {})}
+        {...(actions ? { actions } : {})}
+      />
 
-      <main className="divide-border flex min-h-0 flex-1 flex-col divide-y md:flex-row md:divide-x md:divide-y-0">
-        <section className="flex min-h-0 flex-1 flex-col gap-2 p-4">
-          <Label htmlFor="tool-input" className="text-muted-foreground text-xs font-medium">
-            {inputLabel}
-          </Label>
-          <Textarea
-            id="tool-input"
-            value={value}
-            onChange={(event) => onValueChange(event.target.value)}
-            placeholder={placeholder}
-            spellCheck={false}
-            className="min-h-40 flex-1 resize-none font-mono text-sm"
-          />
-        </section>
-
-        <section className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">{children}</section>
-      </main>
+      <ResizableSplit
+        start={
+          <section className="flex min-h-0 flex-1 flex-col gap-2 p-4">
+            <Label htmlFor="tool-input" className="text-muted-foreground text-xs font-medium">
+              {inputLabel}
+            </Label>
+            <Textarea
+              id="tool-input"
+              value={value}
+              onChange={(event) => onValueChange(event.target.value)}
+              placeholder={placeholder}
+              spellCheck={false}
+              className="min-h-40 flex-1 resize-none font-mono text-sm"
+            />
+          </section>
+        }
+        end={
+          <section className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">{children}</section>
+        }
+      />
     </div>
   );
 }

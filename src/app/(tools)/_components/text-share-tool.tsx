@@ -21,7 +21,9 @@ import { AppHeader } from "./app-header";
 import { EditorPanel } from "./editor-panel";
 import { Panel } from "./panel";
 import { PreviewPanel } from "./preview-panel";
+import { ResizableSplit } from "./resizable-split";
 import { StatusBar } from "./status-bar";
+import { TitleDialog } from "./title-dialog";
 import { Toast } from "./toast";
 import { TextShareActions } from "./tool-header";
 
@@ -43,6 +45,11 @@ export function TextShareTool({
   const [linkError, setLinkError] = useState<string | null>(null);
   const [retention, setRetention] = useState<Retention>("ONE_MONTH");
   const [savedCode, setSavedCode] = useState<string | null>(initialShare?.code ?? null);
+  // Only ever set from a server response, so it appears exactly when the reader owns the share.
+  const [viewCount, setViewCount] = useState<number | undefined>(initialShare?.viewCount);
+  const [title, setTitle] = useState<string | undefined>(initialShare?.title);
+  const [hasPassword, setHasPassword] = useState(initialShare?.hasPassword === true);
+  const [namingCode, setNamingCode] = useState<string | null>(null);
 
   const toast = useToast();
   const { save, saving } = useSaveShare();
@@ -77,6 +84,10 @@ export function TextShareTool({
   const handleTextChange = (next: string) => {
     setLinkError(null);
     setSavedCode(null);
+    // The edited text is no longer the share the count or the title belong to.
+    setViewCount(undefined);
+    setTitle(undefined);
+    setHasPassword(false);
     setText(next);
   };
 
@@ -119,10 +130,17 @@ export function TextShareTool({
     }
 
     setSavedCode(result.code);
+    setViewCount(result.viewCount ?? 0);
+    setTitle(result.title);
+    setHasPassword(result.hasPassword === true);
     replaceUrl(sharePath(result.code));
 
     const copied = await copyToClipboard(window.location.href);
     toast.show(copied ? "Saved — link copied" : "Saved — the link is in the address bar");
+
+    // Only for a signed-in owner: a share saved anonymously belongs to no history, so there is
+    // nowhere for a title to be useful.
+    if (user) setNamingCode(result.code);
   };
 
   return (
@@ -130,9 +148,11 @@ export function TextShareTool({
       <AppHeader
         tool="share"
         {...(user ? { user } : {})}
+        {...(siteKey ? { siteKey } : {})}
         actions={
           <TextShareActions
             url={url}
+            {...(savedCode !== null && viewCount !== undefined ? { viewCount } : {})}
             choice={choice}
             onChoiceChange={handleChoiceChange}
             onCopy={() => void handleCopy()}
@@ -140,6 +160,7 @@ export function TextShareTool({
             onRetentionChange={setRetention}
             onSave={() => void handleSave()}
             saving={saving}
+            viewingSaved={savedCode !== null}
           />
         }
       />
@@ -150,14 +171,31 @@ export function TextShareTool({
         </Alert>
       )}
 
-      <main className="divide-border flex min-h-0 flex-1 flex-col divide-y md:flex-row md:divide-x md:divide-y-0">
-        <Panel title="Editor">
-          <EditorPanel value={text} onChange={handleTextChange} />
-        </Panel>
-        <PreviewPanel text={text} format={format} />
-      </main>
+      <ResizableSplit
+        start={
+          <Panel title="Editor">
+            <EditorPanel value={text} onChange={handleTextChange} />
+          </Panel>
+        }
+        end={<PreviewPanel text={text} format={format} />}
+      />
 
       <StatusBar characters={text.length} urlLength={url.length} />
+      {savedCode !== null && (
+        <TitleDialog
+          code={savedCode}
+          open={namingCode === savedCode}
+          {...(title === undefined ? {} : { initialTitle: title })}
+          hasPassword={hasPassword}
+          {...(siteKey ? { siteKey } : {})}
+          onOpenChange={(next) => setNamingCode(next ? savedCode : null)}
+          onSaved={(settings) => {
+            setTitle(settings.title);
+            if (settings.hasPassword !== undefined) setHasPassword(settings.hasPassword);
+          }}
+        />
+      )}
+
       <Toast message={toast.message} />
     </div>
   );

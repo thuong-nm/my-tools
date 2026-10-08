@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { History, X } from "lucide-react";
+import { History, Lock, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -13,8 +13,9 @@ import { ApiError, apiFetch } from "@/lib/http/client";
 import { formatTimestamp } from "@/app/(tools)/_lib/format-timestamp";
 import { sharePath } from "@/app/(tools)/_lib/routes";
 import { CopyLinkButton } from "./copy-link-button";
+import { TitleDialog, type ShareSettings } from "./title-dialog";
 
-export function HistoryPanel() {
+export function HistoryPanel({ siteKey }: { readonly siteKey?: string }) {
   return (
     <Dialog.Root>
       <Dialog.Trigger
@@ -39,7 +40,7 @@ export function HistoryPanel() {
           {/* Mounted only while open, so a fresh fetch runs on every open and the loading state
               is the absence of data rather than a flag an effect has to set. */}
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <HistoryList />
+            <HistoryList {...(siteKey ? { siteKey } : {})} />
           </div>
         </Dialog.Popup>
       </Dialog.Portal>
@@ -47,9 +48,24 @@ export function HistoryPanel() {
   );
 }
 
-function HistoryList() {
+function HistoryList({ siteKey }: { readonly siteKey?: string }) {
   const [shares, setShares] = useState<readonly TextShareSummaryDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Patched in place rather than refetched: the list is already correct apart from one field,
+  // and a refetch would scroll-jump the panel the person is reading.
+  const applyUpdate = (code: string, settings: ShareSettings) =>
+    setShares((current) =>
+      current?.map((row) =>
+        row.code === code
+          ? {
+              ...row,
+              ...(settings.title === undefined ? {} : { title: settings.title }),
+              ...(settings.hasPassword === undefined ? {} : { hasPassword: settings.hasPassword }),
+            }
+          : row,
+      ) ?? current,
+    );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -104,14 +120,18 @@ function HistoryList() {
             className="focus-visible:ring-ring/50 flex min-w-0 flex-1 flex-col gap-1 rounded-lg px-2 py-2 text-left focus-visible:ring-3 focus-visible:outline-none"
           >
             <span className="flex items-center gap-2">
-              <span className="truncate font-mono text-sm">{share.code}</span>
+              <span className="truncate text-sm font-medium">{share.title ?? share.code}</span>
               <Badge variant="outline">{share.format}</Badge>
+              {share.hasPassword === true && (
+                <Lock className="text-muted-foreground size-3.5 shrink-0" aria-label="Password protected" />
+              )}
               {/* Trusted from the server: the viewer's device clock may disagree with the
                   expiry the link is actually served against. */}
               {share.expired && <Badge variant="destructive">Expired</Badge>}
             </span>
 
             <span className="text-muted-foreground text-xs">
+              {share.title !== undefined && <span className="font-mono">{share.code} · </span>}
               Saved <time dateTime={share.createdAtUtc}>{formatTimestamp(share.createdAtUtc)}</time>
               {" · "}
               {share.expired ? "Expired" : "Expires"}{" "}
@@ -119,9 +139,49 @@ function HistoryList() {
             </span>
           </Dialog.Close>
 
+          <RenameButton
+            share={share}
+            {...(siteKey ? { siteKey } : {})}
+            onUpdated={applyUpdate}
+          />
           <CopyLinkButton path={sharePath(share.code)} />
         </li>
       ))}
     </ul>
+  );
+}
+
+function RenameButton({
+  share,
+  siteKey,
+  onUpdated,
+}: {
+  readonly share: TextShareSummaryDto;
+  readonly siteKey?: string;
+  readonly onUpdated: (code: string, settings: ShareSettings) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`Edit ${share.title ?? share.code}`}
+        title="Title and password"
+        onClick={() => setOpen(true)}
+      >
+        <Pencil />
+      </Button>
+      <TitleDialog
+        code={share.code}
+        open={open}
+        {...(share.title === undefined ? {} : { initialTitle: share.title })}
+        hasPassword={share.hasPassword === true}
+        {...(siteKey ? { siteKey } : {})}
+        onOpenChange={setOpen}
+        onSaved={(settings) => onUpdated(share.code, settings)}
+      />
+    </>
   );
 }

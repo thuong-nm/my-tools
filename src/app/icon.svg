@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Inverts with the browser chrome so the mark never sinks into the tab bar. These are the
+       hex forms of the primary / primary-foreground tokens, which an SVG cannot read.
+       Keep double hyphens out of these comments: XML forbids them, and an invalid comment
+       makes the whole file fail to decode while still serving a perfectly healthy 200. -->
+  <style>
+    .bg { fill: #171717 }
+    .fg { fill: #fafafa; stroke: #fafafa }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #e5e5e5 }
+      .fg { fill: #171717; stroke: #171717 }
+    }
+  </style>
+  <rect class="bg" width="32" height="32" rx="7" />
+  <!-- The header's Share2 mark, scaled into the square. Nodes are filled rather than outlined:
+       a 2px ring collapses into a blob at the 16px a tab actually renders. -->
+  <g transform="translate(6.4 6.4) scale(0.8)" stroke-width="3" stroke-linecap="round">
+    <path class="fg" d="M8.59 13.51 15.42 17.49" />
+    <path class="fg" d="M15.41 6.51 8.59 10.49" />
+    <circle class="fg" cx="18" cy="5" r="3.6" />
+    <circle class="fg" cx="6" cy="12" r="3.6" />
+    <circle class="fg" cx="18" cy="19" r="3.6" />
+  </g>
+</svg>
