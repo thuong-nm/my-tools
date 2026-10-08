@@ -78,12 +78,23 @@ export function fakeTextShareRepository(): FakeTextShareRepository {
       return ok(viewers.get(code)?.size ?? 0);
     },
 
-    async renameByOwner(code: ShareCode, ownerId: UserId, title: string | undefined) {
+    async updateByOwner(
+      code: ShareCode,
+      ownerId: UserId,
+      patch: { readonly title?: string | undefined; readonly passwordHash?: string | undefined },
+    ) {
       const share = rows.get(code);
       if (!share || share.ownerId !== ownerId) return ok(false);
 
-      const renamed = share.rename(title ?? "");
-      if (!renamed.ok) return ok(false);
+      if ("title" in patch) {
+        const renamed = share.rename(patch.title ?? "");
+        if (!renamed.ok) return ok(false);
+      }
+
+      if ("passwordHash" in patch) {
+        const set = share.setPasswordHash(patch.passwordHash);
+        if (!set.ok) return ok(false);
+      }
 
       return ok(true);
     },

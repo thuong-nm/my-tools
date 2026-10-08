@@ -12,6 +12,8 @@ export type TextShareDto = {
   readonly expiresAtUtc: string;
   /** Public: whoever opens the link sees it, and it becomes the browser tab's title. */
   readonly title?: string;
+  /** Anyone opening a protected link finds out anyway, so this is not withheld. */
+  readonly hasPassword?: boolean;
   /** Distinct viewers, excluding the owner. Omitted entirely unless the reader owns the share. */
   readonly viewCount?: number;
 };
@@ -24,6 +26,7 @@ export type TextShareSummaryDto = {
   readonly createdAtUtc: string;
   readonly expiresAtUtc: string;
   readonly title?: string;
+  readonly hasPassword?: boolean;
   /** Decided server-side so the list does not depend on the viewer's device clock. */
   readonly expired: boolean;
 };
@@ -32,6 +35,7 @@ export function toTextShareDto(share: TextShare, viewCount?: number): TextShareD
   return {
     ...(viewCount === undefined ? {} : { viewCount }),
     ...(share.title === undefined ? {} : { title: share.title }),
+    ...(share.hasPassword ? { hasPassword: true } : {}),
     code: share.code,
     content: share.content,
     format: share.format,
@@ -43,6 +47,7 @@ export function toTextShareDto(share: TextShare, viewCount?: number): TextShareD
 export function toTextShareSummaryDto(share: TextShare, now: Date): TextShareSummaryDto {
   return {
     ...(share.title === undefined ? {} : { title: share.title }),
+    ...(share.hasPassword ? { hasPassword: true } : {}),
     code: share.code,
     format: share.format,
     createdAtUtc: share.createdAt.toISOString(),

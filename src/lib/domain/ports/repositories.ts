@@ -41,12 +41,16 @@ export type TextShareRepository = {
   /**
    * Ownership is part of the WHERE clause, not a check the caller makes first: reading then
    * writing would let a share change hands between the two statements.
+   * An absent key is left alone; `undefined` inside a present key clears the column.
    * Answers false when no row matched — unknown code, or not this owner's.
    */
-  renameByOwner(
+  updateByOwner(
     code: ShareCode,
     ownerId: UserId,
-    title: string | undefined,
+    patch: {
+      readonly title?: string | undefined;
+      readonly passwordHash?: string | undefined;
+    },
   ): Promise<Result<boolean, RepositoryError>>;
 };
 

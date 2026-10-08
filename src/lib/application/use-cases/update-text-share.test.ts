@@ -5,7 +5,7 @@ import { unwrap } from "@/lib/domain/shared/result";
 import { MAX_SHARE_TITLE_LENGTH } from "@/lib/domain/value-objects/share-title";
 import { fakeTextShareRepository } from "@/lib/testing/fakes/text-share-repository";
 import { getTextShare } from "./get-text-share";
-import { renameTextShare } from "./rename-text-share";
+import { updateTextShare } from "./update-text-share";
 
 const NOW = new Date("2026-09-23T10:00:00.000Z");
 const OWNER = "4e1ccd7e-7402-4aca-8fd3-c348b09a5b63";
@@ -29,20 +29,22 @@ async function setup({ anonymous = false } = {}) {
     ),
   );
 
-  return { shares, deps: { shares }, read: { shares, now: () => NOW } };
+  const hashPassword = async (password: string) => `scrypt$${password}`;
+
+  return { shares, deps: { shares, hashPassword }, read: { shares, now: () => NOW } };
 }
 
-describe("renameTextShare", () => {
+describe("updateTextShare", () => {
   it("sets a title the owner can read back", async () => {
     const { deps, read } = await setup();
 
-    const renamed = await renameTextShare(
+    const renamed = await updateTextShare(
       { code: "abcdef2345", ownerId: OWNER, title: "  Release   notes  " },
       deps,
     );
 
     // Whitespace is collapsed rather than rejected, so a pasted heading just works.
-    expect(renamed).toEqual({ ok: true, value: "Release notes" });
+    expect(renamed).toEqual({ ok: true, value: { title: "Release notes" } });
 
     const read1 = await getTextShare({ code: "abcdef2345" }, read);
     expect(read1.ok && read1.value.title).toBe("Release notes");
@@ -50,7 +52,7 @@ describe("renameTextShare", () => {
 
   it("is public — a signed-out reader gets the title", async () => {
     const { deps, read } = await setup();
-    await renameTextShare({ code: "abcdef2345", ownerId: OWNER, title: "Public name" }, deps);
+    await updateTextShare({ code: "abcdef2345", ownerId: OWNER, title: "Public name" }, deps);
 
     const result = await getTextShare({ code: "abcdef2345" }, read);
 
@@ -59,11 +61,11 @@ describe("renameTextShare", () => {
 
   it("clears the title when given a blank one", async () => {
     const { deps, read } = await setup();
-    await renameTextShare({ code: "abcdef2345", ownerId: OWNER, title: "Temporary" }, deps);
+    await updateTextShare({ code: "abcdef2345", ownerId: OWNER, title: "Temporary" }, deps);
 
-    const cleared = await renameTextShare({ code: "abcdef2345", ownerId: OWNER, title: "   " }, deps);
+    const cleared = await updateTextShare({ code: "abcdef2345", ownerId: OWNER, title: "   " }, deps);
 
-    expect(cleared).toEqual({ ok: true, value: undefined });
+    expect(cleared).toEqual({ ok: true, value: {} });
     const result = await getTextShare({ code: "abcdef2345" }, read);
     expect(result.ok && "title" in result.value).toBe(false);
   });
@@ -71,7 +73,7 @@ describe("renameTextShare", () => {
   it("answers NOT_FOUND for somebody else's share, never FORBIDDEN", async () => {
     const { deps } = await setup();
 
-    const result = await renameTextShare(
+    const result = await updateTextShare(
       { code: "abcdef2345", ownerId: STRANGER, title: "Mine now" },
       deps,
     );
@@ -83,7 +85,7 @@ describe("renameTextShare", () => {
   it("answers NOT_FOUND for an anonymous share, which has no owner to be", async () => {
     const { deps } = await setup({ anonymous: true });
 
-    const result = await renameTextShare(
+    const result = await updateTextShare(
       { code: "abcdef2345", ownerId: OWNER, title: "Claiming this" },
       deps,
     );
@@ -94,7 +96,7 @@ describe("renameTextShare", () => {
   it("answers NOT_FOUND for a code that does not exist", async () => {
     const { deps } = await setup();
 
-    const result = await renameTextShare(
+    const result = await updateTextShare(
       { code: "zzzzzzzzzz", ownerId: OWNER, title: "Nothing" },
       deps,
     );
@@ -105,13 +107,13 @@ describe("renameTextShare", () => {
   it("rejects a title past the cap, and accepts one exactly at it", async () => {
     const { deps } = await setup();
 
-    const tooLong = await renameTextShare(
+    const tooLong = await updateTextShare(
       { code: "abcdef2345", ownerId: OWNER, title: "x".repeat(MAX_SHARE_TITLE_LENGTH + 1) },
       deps,
     );
     expect(!tooLong.ok && tooLong.error.code).toBe("VALIDATION_FAILED");
 
-    const atCap = await renameTextShare(
+    const atCap = await updateTextShare(
       { code: "abcdef2345", ownerId: OWNER, title: "x".repeat(MAX_SHARE_TITLE_LENGTH) },
       deps,
     );
@@ -121,11 +123,11 @@ describe("renameTextShare", () => {
   it("strips control characters instead of storing a title with a newline in it", async () => {
     const { deps } = await setup();
 
-    const result = await renameTextShare(
+    const result = await updateTextShare(
       { code: "abcdef2345", ownerId: OWNER, title: "Line one\nLine two\tend" },
       deps,
     );
 
-    expect(result).toEqual({ ok: true, value: "Line one Line two end" });
+    expect(result).toEqual({ ok: true, value: { title: "Line one Line two end" } });
   });
 });

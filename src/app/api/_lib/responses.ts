@@ -28,6 +28,10 @@ const WIRE_CODE: Readonly<Record<string, WireCode>> = {
   RESET_TOKEN_EXPIRED: "NOT_FOUND",
   RESET_TOKEN_ALREADY_USED: "NOT_FOUND",
   NOTIFIER_UNAVAILABLE: "UPSTREAM_UNAVAILABLE",
+  // 401, not 403: the caller has not presented a credential yet, and presenting one is exactly
+  // what will work. A wrong one is the same code, so neither answer says which.
+  TEXT_SHARE_LOCKED: "UNAUTHENTICATED",
+  INVALID_SHARE_PASSWORD: "UNAUTHENTICATED",
 };
 
 export function wireCode(code: string): WireCode {

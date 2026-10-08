@@ -21,6 +21,7 @@ import { AppHeader } from "./app-header";
 import { EditorPanel } from "./editor-panel";
 import { Panel } from "./panel";
 import { PreviewPanel } from "./preview-panel";
+import { ResizableSplit } from "./resizable-split";
 import { StatusBar } from "./status-bar";
 import { TitleDialog } from "./title-dialog";
 import { Toast } from "./toast";
@@ -47,6 +48,7 @@ export function TextShareTool({
   // Only ever set from a server response, so it appears exactly when the reader owns the share.
   const [viewCount, setViewCount] = useState<number | undefined>(initialShare?.viewCount);
   const [title, setTitle] = useState<string | undefined>(initialShare?.title);
+  const [hasPassword, setHasPassword] = useState(initialShare?.hasPassword === true);
   const [namingCode, setNamingCode] = useState<string | null>(null);
 
   const toast = useToast();
@@ -85,6 +87,7 @@ export function TextShareTool({
     // The edited text is no longer the share the count or the title belong to.
     setViewCount(undefined);
     setTitle(undefined);
+    setHasPassword(false);
     setText(next);
   };
 
@@ -129,6 +132,7 @@ export function TextShareTool({
     setSavedCode(result.code);
     setViewCount(result.viewCount ?? 0);
     setTitle(result.title);
+    setHasPassword(result.hasPassword === true);
     replaceUrl(sharePath(result.code));
 
     const copied = await copyToClipboard(window.location.href);
@@ -167,12 +171,14 @@ export function TextShareTool({
         </Alert>
       )}
 
-      <main className="divide-border flex min-h-0 flex-1 flex-col divide-y md:flex-row md:divide-x md:divide-y-0">
-        <Panel title="Editor">
-          <EditorPanel value={text} onChange={handleTextChange} />
-        </Panel>
-        <PreviewPanel text={text} format={format} />
-      </main>
+      <ResizableSplit
+        start={
+          <Panel title="Editor">
+            <EditorPanel value={text} onChange={handleTextChange} />
+          </Panel>
+        }
+        end={<PreviewPanel text={text} format={format} />}
+      />
 
       <StatusBar characters={text.length} urlLength={url.length} />
       {savedCode !== null && (
@@ -180,9 +186,13 @@ export function TextShareTool({
           code={savedCode}
           open={namingCode === savedCode}
           {...(title === undefined ? {} : { initialTitle: title })}
+          hasPassword={hasPassword}
           {...(siteKey ? { siteKey } : {})}
           onOpenChange={(next) => setNamingCode(next ? savedCode : null)}
-          onSaved={setTitle}
+          onSaved={(settings) => {
+            setTitle(settings.title);
+            if (settings.hasPassword !== undefined) setHasPassword(settings.hasPassword);
+          }}
         />
       )}
 

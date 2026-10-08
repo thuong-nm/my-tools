@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { currentUser } from "@/app/_lib/current-user";
 import { recaptchaSiteKey } from "@/app/_lib/recaptcha";
+import { hasUnlock } from "@/app/_lib/share-unlock";
 import { TextShareTool } from "@/app/(tools)/_components/text-share-tool";
+import { UnlockForm } from "@/app/(tools)/_components/unlock-form";
 import { getTextShare } from "@/lib/application/use-cases/get-text-share";
 import { recordShareView } from "@/lib/application/use-cases/record-share-view";
 import { getContainer } from "@/lib/infrastructure/container";
@@ -15,6 +17,8 @@ export async function generateMetadata({ params }: PageProps<"/s/[code]">): Prom
   const { code } = await params;
 
   const { repositories, now } = getContainer();
+  // No viewer and no grant, so a protected share answers LOCKED and its title never
+  // reaches the tab or a link preview.
   const result = await getTextShare({ code }, { shares: repositories.textShares, now });
 
   const title = result.ok ? result.value.title : undefined;
@@ -42,16 +46,19 @@ export default async function SharedTextPage({ params }: PageProps<"/s/[code]">)
   await recordView(code, user?.id);
 
   const result = await getTextShare(
-    { code, ...(user ? { viewerId: user.id } : {}) },
+    { code, ...(user ? { viewerId: user.id } : {}), unlocked: await hasUnlock(code) },
     { shares: repositories.textShares, now },
   );
 
+  const siteKey = recaptchaSiteKey();
+
   if (!result.ok) {
+    if (result.error.code === "TEXT_SHARE_LOCKED") {
+      return <UnlockForm code={code} {...(siteKey ? { siteKey } : {})} />;
+    }
     if (MEANS_NOTHING_HERE.has(result.error.code)) notFound();
     throw new Error(`Could not load share ${code}: ${result.error.message}`);
   }
-
-  const siteKey = recaptchaSiteKey();
 
   return (
     <TextShareTool

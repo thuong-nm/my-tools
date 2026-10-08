@@ -5,13 +5,16 @@ import { readJson } from "@/app/api/_lib/request";
 import { recaptchaTokenField, rejectIfNotHuman } from "@/app/api/_lib/require-human";
 import { badRequest, errorResponse, ok, unauthenticated } from "@/app/api/_lib/responses";
 import { getTextShare } from "@/lib/application/use-cases/get-text-share";
-import { renameTextShare } from "@/lib/application/use-cases/rename-text-share";
+import { updateTextShare } from "@/lib/application/use-cases/update-text-share";
+import { MAX_PASSWORD_LENGTH } from "@/lib/domain/value-objects/password";
 import { MAX_SHARE_TITLE_LENGTH } from "@/lib/domain/value-objects/share-title";
 import { getContainer } from "@/lib/infrastructure/container";
 
-// A little slack over the domain cap so trailing whitespace is trimmed rather than rejected.
-const renameSchema = z.object({
-  title: z.string().max(MAX_SHARE_TITLE_LENGTH + 64),
+// Both fields are optional, and absent means "leave it": the dialog cannot show the current
+// password, so an untouched field must never unlock a link. `null` is how removal is asked for.
+const updateSchema = z.object({
+  title: z.string().max(MAX_SHARE_TITLE_LENGTH + 64).optional(),
+  password: z.string().max(MAX_PASSWORD_LENGTH).nullable().optional(),
   recaptchaToken: recaptchaTokenField,
 });
 
@@ -35,7 +38,7 @@ export async function PATCH(request: Request, { params }: RouteContext<"/api/tex
   const { code } = await params;
 
   const body = await readJson(request);
-  const parsed = renameSchema.safeParse(body);
+  const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error);
 
   const rejected = await rejectIfNotHuman(request, "rename_share", parsed.data.recaptchaToken);
@@ -46,14 +49,17 @@ export async function PATCH(request: Request, { params }: RouteContext<"/api/tex
   const ownerId = await sessionUserId();
   if (!ownerId) return unauthenticated();
 
-  const { repositories } = getContainer();
+  const { repositories, hashPassword } = getContainer();
 
-  const result = await renameTextShare(
-    { code, ownerId, title: parsed.data.title },
-    { shares: repositories.textShares },
+  const result = await updateTextShare(
+    {
+      code,
+      ownerId,
+      ...(parsed.data.title === undefined ? {} : { title: parsed.data.title }),
+      ...(parsed.data.password === undefined ? {} : { password: parsed.data.password }),
+    },
+    { shares: repositories.textShares, hashPassword },
   );
 
-  return result.ok
-    ? ok({ share: { code, ...(result.value === undefined ? {} : { title: result.value }) } })
-    : errorResponse(result.error);
+  return result.ok ? ok({ share: { code, ...result.value } }) : errorResponse(result.error);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { History, Pencil, X } from "lucide-react";
+import { History, Lock, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -13,7 +13,7 @@ import { ApiError, apiFetch } from "@/lib/http/client";
 import { formatTimestamp } from "@/app/(tools)/_lib/format-timestamp";
 import { sharePath } from "@/app/(tools)/_lib/routes";
 import { CopyLinkButton } from "./copy-link-button";
-import { TitleDialog } from "./title-dialog";
+import { TitleDialog, type ShareSettings } from "./title-dialog";
 
 export function HistoryPanel({ siteKey }: { readonly siteKey?: string }) {
   return (
@@ -54,10 +54,16 @@ function HistoryList({ siteKey }: { readonly siteKey?: string }) {
 
   // Patched in place rather than refetched: the list is already correct apart from one field,
   // and a refetch would scroll-jump the panel the person is reading.
-  const applyRename = (code: string, title: string | undefined) =>
+  const applyUpdate = (code: string, settings: ShareSettings) =>
     setShares((current) =>
       current?.map((row) =>
-        row.code === code ? { ...row, ...(title === undefined ? {} : { title }) } : row,
+        row.code === code
+          ? {
+              ...row,
+              ...(settings.title === undefined ? {} : { title: settings.title }),
+              ...(settings.hasPassword === undefined ? {} : { hasPassword: settings.hasPassword }),
+            }
+          : row,
       ) ?? current,
     );
 
@@ -116,6 +122,9 @@ function HistoryList({ siteKey }: { readonly siteKey?: string }) {
             <span className="flex items-center gap-2">
               <span className="truncate text-sm font-medium">{share.title ?? share.code}</span>
               <Badge variant="outline">{share.format}</Badge>
+              {share.hasPassword === true && (
+                <Lock className="text-muted-foreground size-3.5 shrink-0" aria-label="Password protected" />
+              )}
               {/* Trusted from the server: the viewer's device clock may disagree with the
                   expiry the link is actually served against. */}
               {share.expired && <Badge variant="destructive">Expired</Badge>}
@@ -133,7 +142,7 @@ function HistoryList({ siteKey }: { readonly siteKey?: string }) {
           <RenameButton
             share={share}
             {...(siteKey ? { siteKey } : {})}
-            onRenamed={applyRename}
+            onUpdated={applyUpdate}
           />
           <CopyLinkButton path={sharePath(share.code)} />
         </li>
@@ -145,11 +154,11 @@ function HistoryList({ siteKey }: { readonly siteKey?: string }) {
 function RenameButton({
   share,
   siteKey,
-  onRenamed,
+  onUpdated,
 }: {
   readonly share: TextShareSummaryDto;
   readonly siteKey?: string;
-  readonly onRenamed: (code: string, title: string | undefined) => void;
+  readonly onUpdated: (code: string, settings: ShareSettings) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -158,8 +167,8 @@ function RenameButton({
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label={`Rename ${share.title ?? share.code}`}
-        title="Rename"
+        aria-label={`Edit ${share.title ?? share.code}`}
+        title="Title and password"
         onClick={() => setOpen(true)}
       >
         <Pencil />
@@ -168,9 +177,10 @@ function RenameButton({
         code={share.code}
         open={open}
         {...(share.title === undefined ? {} : { initialTitle: share.title })}
+        hasPassword={share.hasPassword === true}
         {...(siteKey ? { siteKey } : {})}
         onOpenChange={setOpen}
-        onSaved={(title) => onRenamed(share.code, title)}
+        onSaved={(settings) => onUpdated(share.code, settings)}
       />
     </>
   );

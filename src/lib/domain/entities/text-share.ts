@@ -5,6 +5,7 @@ import { contentFormat, type ContentFormat } from "../value-objects/content-form
 import { expiryFrom, retention } from "../value-objects/retention";
 import { shareCode, type ShareCode } from "../value-objects/share-code";
 import { shareTitle, type ShareTitle } from "../value-objects/share-title";
+import { passwordHash as toPasswordHash, type PasswordHash } from "../value-objects/password";
 import { sharedText, type SharedText } from "../value-objects/shared-text";
 
 export type CreateTextShareProps = {
@@ -27,11 +28,12 @@ export type RestoreTextShareProps = {
   readonly expiresAt: Date;
   readonly ownerId?: string;
   readonly title?: string;
+  readonly passwordHash?: string;
 };
 
 // The shared CONTENT is write-once — there is no behaviour that rewrites it, so no state machine
-// and no transition table. The title is the one mutable part, and it changes only through
-// `rename`. Expiry is derived from the clock on every read rather than stored as a status, which
+// and no transition table. The title and the password are the mutable parts, and each changes
+// only through its own named method. Expiry is derived from the clock on every read rather than stored as a status, which
 // would go stale the moment nothing runs to update it.
 export class TextShare {
   private constructor(
@@ -44,7 +46,31 @@ export class TextShare {
     readonly expiresAt: Date,
     readonly ownerId: UserId | undefined,
     private _title: ShareTitle | undefined,
+    private _passwordHash: PasswordHash | undefined,
   ) {}
+
+  /** Public knowledge: anyone opening the link finds out anyway. */
+  get hasPassword(): boolean {
+    return this._passwordHash !== undefined;
+  }
+
+  get passwordHash(): PasswordHash | undefined {
+    return this._passwordHash;
+  }
+
+  /** `undefined` removes the password. The hash is produced outside — the domain has no crypto. */
+  setPasswordHash(hash: string | undefined): Result<void, ValidationError> {
+    if (hash === undefined) {
+      this._passwordHash = undefined;
+      return ok(undefined);
+    }
+
+    const parsed = toPasswordHash(hash);
+    if (isErr(parsed)) return parsed;
+
+    this._passwordHash = parsed.value;
+    return ok(undefined);
+  }
 
   get title(): ShareTitle | undefined {
     return this._title;
@@ -82,6 +108,7 @@ export class TextShare {
         expiryFrom(props.now, window.value),
         props.ownerId === undefined ? undefined : asUserId(props.ownerId),
         undefined,
+        undefined,
       ),
     );
   }
@@ -101,6 +128,9 @@ export class TextShare {
     const title = shareTitle(props.title ?? "");
     if (isErr(title)) return title;
 
+    const stored = props.passwordHash === undefined ? undefined : toPasswordHash(props.passwordHash);
+    if (stored !== undefined && isErr(stored)) return stored;
+
     return ok(
       new TextShare(
         asTextShareId(props.id),
@@ -111,6 +141,7 @@ export class TextShare {
         props.expiresAt,
         props.ownerId === undefined ? undefined : asUserId(props.ownerId),
         title.value,
+        stored === undefined ? undefined : stored.value,
       ),
     );
   }

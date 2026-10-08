@@ -126,16 +126,24 @@ export function textShareRepository(db: PrismaDatabase): TextShareRepository {
 
     // `updateMany` rather than `update`: ownership belongs in the WHERE clause, and the affected
     // count is what tells us whether it matched without a second read.
-    async renameByOwner(code: ShareCode, ownerId: UserId, title: string | undefined) {
+    async updateByOwner(
+      code: ShareCode,
+      ownerId: UserId,
+      patch: { readonly title?: string | undefined; readonly passwordHash?: string | undefined },
+    ) {
+      // `in patch` rather than a truthiness test: an absent key means "leave it", while a
+      // present `undefined` means "clear it", and the two must not collapse.
+      const data = {
+        ...("title" in patch ? { title: patch.title ?? null } : {}),
+        ...("passwordHash" in patch ? { passwordHash: patch.passwordHash ?? null } : {}),
+      };
+
       try {
-        const changed = await db.textShare.updateMany({
-          where: { code, ownerId },
-          data: { title: title ?? null },
-        });
+        const changed = await db.textShare.updateMany({ where: { code, ownerId }, data });
 
         return ok(changed.count > 0);
       } catch (cause) {
-        return err(unavailable("while renaming a share", cause));
+        return err(unavailable("while updating a share", cause));
       }
     },
   };
